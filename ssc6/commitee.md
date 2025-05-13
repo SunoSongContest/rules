@@ -2,6 +2,7 @@
 layout: page
 title: Committee
 permalink: /ssc6/committee/
+parenturl: /ssc6/
 emoji: 🧑‍💻
 order: 7
 short_description: Our superheroes squad!
