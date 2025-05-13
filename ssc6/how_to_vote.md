@@ -2,6 +2,7 @@
 layout: page
 title: How to vote
 permalink: /ssc6/howtovote/
+parenturl: /ssc6/
 emoji: 📥
 order: 5
 short_description: Use the Voting Form to vote, Eurovision-style voting!

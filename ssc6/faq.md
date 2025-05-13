@@ -2,6 +2,7 @@
 layout: page
 title: Frequently Asked Questions
 permalink: /ssc6/faq/
+parenturl: /ssc6/
 emoji: ❓
 order: 10
 short_description: Got some doubts? Check here!

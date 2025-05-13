@@ -2,6 +2,7 @@
 layout: page
 title: How to submit songs
 permalink: /ssc6/howtosubmitsongs/
+parenturl: /ssc6/
 emoji: 📩
 order: 4
 short_description: Use the Submission Form to submit!

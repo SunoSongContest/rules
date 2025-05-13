@@ -2,6 +2,7 @@
 layout: page
 title: What's new
 permalink: /ssc6/whatsnew/
+parenturl: /ssc6/
 emoji: 6️⃣
 order: 1
 short_description: 200 songs, single submission period, Sunovision style voting, 

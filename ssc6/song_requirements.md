@@ -2,6 +2,7 @@
 layout: page
 title: Song requirements
 permalink: /ssc6/songrequirements/
+parenturl: /ssc6/
 emoji: 🎶
 order: 3
 short_description: Read and follow all the requirements!

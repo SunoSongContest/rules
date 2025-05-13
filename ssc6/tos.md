@@ -2,6 +2,7 @@
 layout: page
 title: Terms of Service
 permalink: /ssc6/tos/
+parenturl: /ssc6/
 emoji: 📜
 order: 9
 short_description: By participating in SSC6, you agree to these terms!
