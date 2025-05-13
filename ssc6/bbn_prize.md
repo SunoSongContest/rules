@@ -2,6 +2,7 @@
 layout: page
 title: Best brand new and wildcard prize
 permalink: /ssc6/bbn/
+parenturl: /ssc6/
 emoji: 🎉
 order: 6
 short_description: A specific tag for style prompt, wildcard ticket to SSC7 finals!
