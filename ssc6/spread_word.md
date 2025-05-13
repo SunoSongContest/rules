@@ -2,6 +2,7 @@
 layout: page
 title: Spread the word!
 permalink: /ssc6/spreadtheword/
+parenturl: /ssc6/
 emoji: 📢
 order: 8
 short_description: Share the love with your friends and family!
