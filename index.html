@@ -5,11 +5,10 @@ classname: home
 
 {% assign pages = site.pages | sort: 'order' %}
 
-<h1>Welcome to SSC6!</h1>
+<h1>Welcome to Suno Song Contest!</h1>
 <p>
     We’re excited to have you here to contribute your creativity, 
-    connect with friends all around the world, and appreciate inspiring music!<br>
-    <b>The rules below should explain everything you need to know about SSC6!</b>
+    connect with friends all around the world, and appreciate inspiring music!
     <br><br>
 </p>
 
@@ -36,10 +35,10 @@ classname: home
     <br>
     @jonathankennedy
 </p>
-<h2 class="rules-h">Guides</h2>
+<h2 class="rules-h">Editions</h2>
 <div class="pages">
     {% for page in pages %}
-        {% if page.path contains 'ssc6/' page.title and page.emoji and page.tag and page.tag == 'guide' %}
+        {% if page.title and page.emoji and page.tag and page.tag == 'contest-edition' %}
         <a href="{{ page.url | prepend: site.baseurl }}">
             <span class="emoji">{{ page.emoji }}</span>
             <b>{{ page.title }}</b>
