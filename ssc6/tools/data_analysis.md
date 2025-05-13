@@ -1,7 +1,8 @@
 ---
-layout: 
+layout:
 title: Votes visualization
 permalink: /ssc6/tools/data-analysis/
+parenturl: /ssc6/
 emoji: 🔬
 order: 1
 short_description: Inspect SSC6 weeks' data with an analyzation tool made by @spupuz
