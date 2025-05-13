@@ -43,6 +43,7 @@ tag: contest-edition
 <h2 class="rules-h">Guides</h2>
 <div class="pages">
     {% for page in pages %}
+        <div>{{ page.path }} {{ page.title }}</div>
         {% if page.path contains 'ssc6/' page.title and page.emoji and page.tag and page.tag == 'guide' %}
         <a href="{{ page.url | prepend: site.baseurl }}">
             <span class="emoji">{{ page.emoji }}</span>
