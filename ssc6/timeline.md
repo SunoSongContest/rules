@@ -2,6 +2,7 @@
 layout: page
 title: Timeline
 permalink: /ssc6/timeline/
+parenturl: /ssc6/
 emoji: 📆
 order: 2
 short_description: One long submission period, 5 weeks of 40 songs each, 
