@@ -1,0 +1,72 @@
+---
+layout: default
+title: SSC7 Rules
+permalink: /ssc7/
+emoji: 7️⃣
+order: 1
+short_description: 7th Edition of Suno Song Contest
+classname: home
+tag: contest-edition
+---
+
+{% assign pages = site.pages | sort: 'order' %}
+
+<h1>Suno Song Contest 7</h1>
+
+<p>
+  <b>The rules below should explain everything you need to know about SSC7!</b>
+</p>
+
+<h3><b>Important Links:</b></h3>
+    
+<p>
+  <!--
+    <br>
+        · All the fun starts on the <b>SSC6 channel</b> on Suno's discord server: <a href="https://discord.com/channels/1069381916492562582/1298690945197277244/1298690945197277244" target="_blank">Here</a>
+    <br>
+    <br>
+    · Follow the <b>announcements channel</b> on the SSC discord server to get notifications about voting periods, live stream times, and other official announcements: <a href="https://discord.com/channels/1267565363579846698/1270307712181469245" target="_blank">Here</a>
+    <br>
+    <br>
+    · Join us on Twitch for the <b>weekly Live Streams</b> where we listen to all the songs live and dance in chat emojis: <a href="https://www.twitch.tv/sunosongcontest" target="_blank">Here</a>
+    
+    <br>
+    <br>
+    <br>
+    If you have any questions, check out the “<i>Frequently Asked Questions</i>” below, or contact:
+    <br>
+    @joshuasodil
+    <br>
+    @teemuth
+    <br>
+    @jonathankennedy
+  -->
+</p>
+
+<h2 class="rules-h">Guides</h2>
+<div class="pages">
+    {% for page in pages %}
+        {% if page.path contains 'ssc7/' page.title and page.emoji and page.tag and page.tag == 'guide' %}
+        <a href="{{ page.url | prepend: site.baseurl }}">
+            <span class="emoji">{{ page.emoji }}</span>
+            <b>{{ page.title }}</b>
+            <i>{{ page.short_description }}</i>
+        </a>
+        {% endif %}
+    {% endfor %}
+</div>
+
+<!--
+<h2 class="rules-h">Tools</h2>
+<div class="pages">
+    {% for page in pages %}
+        {% if page.path contains 'ssc6/tools/' and page.title and page.emoji and page.tag == 'tool' %}
+        <a href="{{ page.url | prepend: site.baseurl }}">
+            <span class="emoji">{{ page.emoji }}</span>
+            <b>{{ page.title }}</b>
+            <i>{{ page.short_description }}</i>
+        </a>
+        {% endif %}
+    {% endfor %}
+</div>
+-->
