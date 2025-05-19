@@ -4,7 +4,7 @@ title: Terms of Service
 permalink: /ssc7/tos/
 parenturl: /ssc7/
 emoji: 📜
-order: 7
+order: 8
 short_description: By participating in SSC7, you agree to these terms!
 classname: page
 tag: guide
