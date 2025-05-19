@@ -5,7 +5,7 @@ permalink: /ssc7/whatsnew/
 parenturl: /ssc7/
 emoji: 🤯
 order: 1
-short_description: 1-month submission time, Weeks live-streams randomized picks, Hidden finalists during weeks, Bonus points from voting, More than 200 songs, No more BBN, and more surprises in store!
+short_description: 1-month submission time, weeks live-streams randomized picks, hidden finalists during weeks, bonus points from voting and more surprises in store!
 classname: page
 tag: guide
 ---
