@@ -19,7 +19,7 @@ Get ready for the excitement—SSC7 will feature **live song reveals** twice a w
 For SSC7, we’re mixing things up!  
 Instead of releasing the weekly playlist all at once, we will **draw the songs live** on stream:
 
-* **Monday Livestream** → 20 songs revealed  
+* **Tuesday Livestream** → 20 songs revealed  
 * **Wednesday Livestream** → another 20 songs revealed  
 
 🎧 The **full weekly playlist** will be available **Wednesday night or Thursday**, right after the second livestream.
