@@ -35,6 +35,7 @@ Due to this structure, **only the first 200 accepted songs** will be spread acro
 Any songs **accepted after the first 200** will not be left out!
 
 These songs will be added to a **special "Bonus Playlist"**, and they will get their **own dedicated voting phase**.
+They won't be streamed as the 200 songs in previous weeks, but still it's a way to give everyone the possibility to participate in SSC7.
 
 * ⏳ This special voting phase will have a **flexible duration** based on the number of songs in the playlist.
 * 🟰 Every accepted song, even beyond the main 200, will still have a **fair chance to compete** for a spot in the finals.
