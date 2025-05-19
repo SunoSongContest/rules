@@ -38,6 +38,6 @@ These songs will be added to a **special "Bonus Playlist"**, and they will get t
 They won't be streamed as the 200 songs in previous weeks, but still it's a way to give everyone the possibility to participate in SSC7.
 
 * ⏳ This special voting phase will have a **flexible duration** based on the number of songs in the playlist.
-* 🟰 Every accepted song, even beyond the main 200, will still have a **fair chance to compete** for a spot in the finals.
+* 🟰 Every accepted song, even beyond the main 200, will still have a **chance to compete** for a spot in the finals.
 
 SSC7 is bigger than ever—so get ready to discover new music every week, and don’t miss the livestreams!
