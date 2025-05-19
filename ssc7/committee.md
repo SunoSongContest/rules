@@ -83,14 +83,14 @@ he’s also deeply committed to building real connections with the community. A 
 <img width="64" height="64" src="https://cdn.discordapp.com/avatars/586908008362278922/9aac387750c3eae862fff723a36ca823.webp?size=128" />
 
 _The grandmaster of guitars and the charismatic face of the streams. Always ready with a smile and honest feedback for every song, Spupuz brings both 
-musical insight and fun energy. Loves Metal with all his soul — and will do *anything* to sneak in one of his own tracks._
+musical insight and fun energy. Loves Metal with all his soul — and will do **anything** to sneak in one of his own tracks._
 
 > Contact him on discord: `@spupuz`
 
 ### 👑 Teemuth
 <img width="64" height="64" src="https://cdn.discordapp.com/avatars/1232141982340481026/3c71349802c4decf1ebefcb7ba4a21bb.webp?size=128" />
 
-_No introduction needed. The guy who *won* SSC with Flosstradamus. Always present, always ready to drop another banger. Bow down to the king of Suno 
+_No introduction needed. The guy who **won** Suno's contest featuring Flosstradamus. Always present, always ready to drop another banger. Bow down to the king of Suno 
 (and the king of punchlines too)!_
 
 > Contact him on discord: `@teemuth`
@@ -98,7 +98,7 @@ _No introduction needed. The guy who *won* SSC with Flosstradamus. Always presen
 ### 🖌️ Jonathan Kennedy
 <img width="64" height="64" src="https://cdn.discordapp.com/avatars/575411033712230413/dbe824b2bfc7f97c585905b00f52906a.webp?size=128" />
 
-_Our beloved visual stylist. Even if he won’t admit it, he *loves* crafting striking visuals and catchy tracks. A creative powerhouse with a sharp eye, 
+_Our beloved visual stylist. Even if he won’t admit it, he **loves** crafting striking visuals and catchy tracks. A creative powerhouse with a sharp eye, 
 he's been instrumental in shaping many of the fantastic ideas you see in SSC._
 
 > Contact him on discord: `@guardian.og`
@@ -106,7 +106,7 @@ he's been instrumental in shaping many of the fantastic ideas you see in SSC._
 ### 💬 Joshua Sodil (aka NamesTaken)
 <img width="64" height="64" src="https://cdn.discordapp.com/avatars/481596817583112192/b768ce07ad231f49ee5c58a321201616.webp?size=128" />
 
-_Our favorite blondie (just kidding... or are we?). A true community favorite, always sliding into your DMs with useful SSC info. Rumor has it he’s s
-ecretly collaborating with Dazorn — and yes, they even made a romantic track together. 🫣_
+_Our favorite blondie (just kidding... or are we?). A true community favorite, always sliding into your DMs with useful SSC info. Rumor has it he’s 
+secretly collaborating with Dazorn — and yes, they even made a romantic track together. 🫣_
 
 > Contact him on discord: `@joshuasodil`
