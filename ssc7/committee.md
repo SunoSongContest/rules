@@ -52,6 +52,13 @@ and a German heart, she blends cultures into art — now joining SSC for the fir
 
 > Contact him on discord: `@panthera_may`
 
+### 🪵 Flickerlog
+<img width="64" height="64" src="https://cdn.discordapp.com/avatars/1122896556656431114/b2e40967188ea75eb9667480093a855b.webp?size=128" />
+
+_Coming soon..._
+
+> Contact him on discord: `@flickerlog`
+
 ## Busy Staff
 
 **Those members won't actively follow SSC7 organization because they are pretty busy right now, but feel free to contact them if you need help.**
