@@ -49,8 +49,6 @@ After your song is approved, you’ll receive a confirmation message letting you
 This message will also contain your **voting password**, which is required to vote during the contest.  
 ➡️ **Keep it secret. Keep it safe.**
 
----
-
 ### 📣 Important Reminders
 
 * After submitting the form, **send a direct message** to one of the following staff members:  
@@ -58,7 +56,5 @@ This message will also contain your **voting password**, which is required to vo
   This ensures we can contact you about your song’s status.
 * The **weekly playlist reveals** will remain a surprise!  
   📺 Stay tuned every **live-stream** to discover which songs are featured each week.
-
----
 
 Let’s make this the most exciting SSC yet—good luck and have fun!
