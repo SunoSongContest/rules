@@ -110,3 +110,10 @@ _Our favorite blondie (just kidding... or are we?). A true community favorite, a
 secretly collaborating with Dazorn — and yes, they even made a romantic track together. 🫣_
 
 > Contact him on discord: `@joshuasodil`
+
+## Secret Staff
+
+### 🌸 3Daizy
+<img width="64" height="64" src="https://cdn.discordapp.com/avatars/757310621577379931/18c0bda3049048147947bcda612f9129.webp?size=128" />
+
+_Suno's Discord supermod! Always present and ready to help, she’s the go-to person for anything related to communication and support within the Suno server._
