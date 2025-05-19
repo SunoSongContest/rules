@@ -4,7 +4,7 @@ title: Frequently Asked Questions
 permalink: /ssc7/faq/
 parenturl: /ssc7/
 emoji: ❓
-order: 8
+order: 9
 short_description: Got some doubts? Check here!
 classname: page
 tag: guide
