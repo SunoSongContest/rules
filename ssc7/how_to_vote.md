@@ -40,3 +40,21 @@ You’ll award points to your favorite songs as follows:
 - **8 to 1 points** – one song for each point level
 
 ✅ You cannot vote for your own song.
+
+### 🔁 Voting Streak Bonus 
+Starting with SSC7, voting consistently each week will reward you with **bonus points**!
+
+Each consecutive week you vote, you’ll earn an increasing number of points:
+
+- **Week 1** = +1 point  
+- **Week 2** = +2 points  
+- **Week 3** = +3 points  
+- **Week 4** = +4 points  
+- **Week 5** = +5 points  
+
+That’s a total of **15 bonus points** available if you vote every week!  
+
+> 🧠 **Example**: If you vote only in Week 1 and Week 3, you’ll get just **1 + 1 = 2 bonus points**.
+
+These streak bonuses will be added to your overall score and may help you qualify for the finals.  
+So stay active and keep voting each week!
