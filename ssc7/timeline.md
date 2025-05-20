@@ -12,88 +12,124 @@ tag: guide
 
 # 📆 Timeline
 
-* One long submission period June 16 - June 21
-* 5 weeks of 40 songs each: Tuesday first 20 songs, Wednesday other 20 songs, then starting from Thursday 7 days to cast votes
-* 1 to 2 weeks for songs over 200 cap
-* 1 week of break for chat, challenges, and cute surprises
-* Finals week starting on August 25
+* 🗓️ **Submission Period**: June 16 – June 21  
+* 🔄 **5 Weeks of Prelims**:  
+  - Each week features 40 songs  
+  - 🎧 Tuesdays: First 20 songs  
+  - 🎧 Wednesdays: Next 20 songs  
+  - 🗳️ Voting opens on Thursdays for 7 days  
+* 🧨 **Extra Rounds**: 1–2 weeks for songs over the 200 cap  
+* 🎉 **Break Week**: Fun, challenges, and cute surprises 💖  
+* 🏆 **Finals Week**: Starts August 25
 
-## Calendar
+---
 
-All the dates below!
+## 📅 Calendar
 
-### Welcome to SSC7
-* `May 22` - SSC7 Announcement
-* `June 16` - Songs Submissions Start
-* `June 21` - Songs Submissions End
+All the key dates below — don’t miss a beat! 🎶
 
-### 200 Songs Weeks
-* `June 23` - Week 1 Start
-* `June 24` - Week 1 Showcase Stream 1
-* `June 25` - Week 1 Showcase Stream 2
-* `June 26` - Week 1 Voting Start
+### 🎉 Welcome to SSC7
+* `May 22` – 📢 Official Announcement  
+* `June 16` – 🚀 Submissions Open  
+* `June 21` – ⏳ Submissions Close
 
-* `June 30` - Week 2 Start
-* `July 1` - Week 2 Showcase Stream 1
-* `July 2` - Week 2 Showcase Stream 2
-* `July 3` - Week 1 Voting End & Week 2 Voting Start
+---
 
-* `July 7` - Week 3 Start
-* `July 8` - Week 3 Showcase Stream 1
-* `July 9` - Week 3 Showcase Stream 2
-* `July 10` - Week 2 Voting End & Week 3 Voting Start
+### 🔥 200 Songs Weeks
 
-* `July 14` - Week 4 Start
-* `July 15` - Week 4 Showcase Stream 1
-* `July 16` - Week 4 Showcase Stream 2
-* `July 17` - Week 3 Voting End & Week 4 Voting Start
+**Week 1**  
+* `June 23` – Week 1 Begins  
+* `June 24` – Showcase Stream 1  
+* `June 25` – Showcase Stream 2  
+* `June 26` – Voting Opens  
 
-* `July 21` - Week 5 Start
-* `July 22` - Week 5 Showcase Stream 1
-* `July 23` - Week 5 Showcase Stream 2
-* `July 24` - Week 4 Voting End & Week 5 Voting Start
-* `July 31` - Week 5 Voting End
+**Week 2**  
+* `June 30` – Week 2 Begins  
+* `July 1` – Showcase Stream 1  
+* `July 2` – Showcase Stream 2  
+* `July 3` – Week 1 Voting Ends & Week 2 Voting Opens  
 
-### Over 200 Songs Weeks
-* `July 25` - Over 200 Songs Showcasing Start
-* `July 31` - Over 200 Songs Voting Start
-* `August 7` - Over 200 Songs Voting End
+**Week 3**  
+* `July 7` – Week 3 Begins  
+* `July 8` – Showcase Stream 1  
+* `July 9` – Showcase Stream 2  
+* `July 10` – Week 2 Voting Ends & Week 3 Voting Opens  
 
-### Challenges Week
-* `August 18` - Challenges Week Start
-* `August 23` - Challenges Week End
+**Week 4**  
+* `July 14` – Week 4 Begins  
+* `July 15` – Showcase Stream 1  
+* `July 16` – Showcase Stream 2  
+* `July 17` – Week 3 Voting Ends & Week 4 Voting Opens  
 
-### Finals Week
-* `August 25` - Finals Week Start
+**Week 5**  
+* `July 21` – Week 5 Begins  
+* `July 22` – Showcase Stream 1  
+* `July 23` – Showcase Stream 2  
+* `July 24` – Week 4 Voting Ends & Week 5 Voting Opens  
+* `July 31` – Week 5 Voting Ends  
 
-## Submissions period
+---
 
-*If* we have extra spaces remaining after the submission period, we may open up another submission period at the committee’s discretion. But if you want to guarantee that your song will be in SSC7 - submit as soon as possible!
+### 🎶 Over 200 Songs Weeks
 
-## SSC7 preliminaries
+* `July 25` – Extra Showcase Begin  
+* `July 31` – Extra Voting Opens  
+* `August 7` – Extra Voting Ends
 
-We will have 5 weeks starting Nov 4 to listen to all songs. Each week we will listen to and vote on 40 songs, which will be randomly assigned from all accepted songs and picked during **Showcase Streams**!
+---
 
-* **Playlist announced**  
-  We will announce the songs of the week in a playlist released around every Wednesday evening or Thursday morning (UTC).
+### 🧩 Challenges Week
 
-* **Promotion periods**  
-  Starting Thursday, and so on for 7 days, participants will be allowed to present and promote their songs twice during the week! Tell everyone how you wrote it, why it matters to you - and tell others what you appreciated about their songs!
+* `August 18` – Let the challenges begin!  
+* `August 23` – Challenges Week ends 🎁
 
-* **Live streams**  
-  Every week, join us live for two live-streaming sessions where we will pick and listen to songs, comment on them, and appreciate all the creativity with guests, dancing emojis, and more!
+---
 
-* **Voting**  
-  We will open the voting period for songs every week on Thursday at 12 p.m. UTC.
+### 🏁 Finals Week
 
-## Over 200 Songs
+* `August 25` – Finals Week kicks off!
 
-After week 5 is over, all the songs submitted not picked before during livestreams, will still have a chance to access the finals!
+---
 
-## Community & Challenge week
+## 📥 Submission Period
 
-Before the finals, we will take a one-week break to celebrate all the participants and prepare for **finals**! We will have some fun challenges during this week with a few more surprises, so stay tuned!
+⚠️ *Note:* If we have leftover spots after the submission deadline, we **may** reopen submissions at the committee’s discretion. But to **guarantee** your spot in SSC7 — submit early!
 
-## Finals week
+---
 
-We will listen to all finalists in the live streams, and will open the voting period between Monday at 12 p.m. UTC and Friday at 12 p.m. UTC.
+## 🎧 SSC7 Preliminaries
+
+We’ll have 5 exciting weeks to listen to and vote on all the submitted songs. Each week features **40 randomly selected songs** showcased in **live streams**.
+
+### 📢 Playlist Announcement  
+Weekly playlists will drop around **Wednesday evening or Thursday morning (UTC)**.
+
+### 📣 Promotion Periods  
+From Thursday onward, each participant can **promote their song twice** during the week. Share how you made it, why it matters — and give love to others’ tracks too 💬💖
+
+### 📺 Live Streams  
+Join us live each week for **two streaming sessions** where we listen, vibe, and react together with special guests and 💃 dancing emojis 🕺
+
+### 🗳️ Voting  
+Voting opens every **Thursday at 12 p.m. UTC** and lasts for 7 days.
+
+---
+
+## 💿 Over 200 Songs
+
+🎲 Didn’t make the first streams? No worries!  
+All songs not picked during Weeks 1–5 will still get their chance to shine — and possibly make it to the finals!
+
+---
+
+## 🌟 Community & Challenge Week
+
+Let’s take a break before the finals! One week to relax, hang out, and enjoy fun challenges, games, and surprises with the community 🎉🎁
+
+---
+
+## 🏆 Finals Week
+
+All finalists will be featured in live streams.  
+🗳️ Voting runs **Monday 12 p.m. UTC to Friday 12 p.m. UTC**.  
+Let’s crown the winners! 👑
