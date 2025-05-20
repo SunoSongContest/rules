@@ -51,8 +51,7 @@ This message will also contain your **voting password**, which is required to vo
 
 ### 📣 Important Reminders
 
-* After submitting the form, **send a direct message** to one of the following staff members:  
-  `@JoshuaSodil`, `@teemuth`, or `@jonathankennedy`  
+* After submitting the form, **send a direct message** to one of the staff members (more info <a href="../committee">here</a>).  
   This ensures we can contact you about your song’s status.
 * The **weekly playlist reveals** will remain a surprise!  
   📺 Stay tuned every **live-stream** to discover which songs are featured each week.
