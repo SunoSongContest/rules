@@ -22,8 +22,6 @@ tag: guide
 * 🎉 **Break Week**: Fun, challenges, and cute surprises 💖  
 * 🏆 **Finals Week**: Starts August 25
 
----
-
 ## 📅 Calendar
 
 All the key dates below — don’t miss a beat! 🎶
@@ -32,8 +30,6 @@ All the key dates below — don’t miss a beat! 🎶
 * `May 22` – 📢 Official Announcement  
 * `June 16` – 🚀 Submissions Open  
 * `June 21` – ⏳ Submissions Close
-
----
 
 ### 🔥 200 Songs Weeks
 
@@ -68,34 +64,24 @@ All the key dates below — don’t miss a beat! 🎶
 * `July 24` – Week 4 Voting Ends & Week 5 Voting Opens  
 * `July 31` – Week 5 Voting Ends  
 
----
-
 ### 🎶 Over 200 Songs Weeks
 
 * `July 25` – Extra Showcase Begin  
 * `July 31` – Extra Voting Opens  
 * `August 7` – Extra Voting Ends
 
----
-
 ### 🧩 Challenges Week
 
 * `August 18` – Let the challenges begin!  
 * `August 23` – Challenges Week ends 🎁
 
----
-
 ### 🏁 Finals Week
 
 * `August 25` – Finals Week kicks off!
 
----
-
 ## 📥 Submission Period
 
 ⚠️ *Note:* If we have leftover spots after the submission deadline, we **may** reopen submissions at the committee’s discretion. But to **guarantee** your spot in SSC7 — submit early!
-
----
 
 ## 🎧 SSC7 Preliminaries
 
@@ -113,20 +99,14 @@ Join us live each week for **two streaming sessions** where we listen, vibe, and
 ### 🗳️ Voting  
 Voting opens every **Thursday at 12 p.m. UTC** and lasts for 7 days.
 
----
-
 ## 💿 Over 200 Songs
 
 🎲 Didn’t make the first streams? No worries!  
 All songs not picked during Weeks 1–5 will still get their chance to shine — and possibly make it to the finals!
 
----
-
 ## 🌟 Community & Challenge Week
 
 Let’s take a break before the finals! One week to relax, hang out, and enjoy fun challenges, games, and surprises with the community 🎉🎁
-
----
 
 ## 🏆 Finals Week
 

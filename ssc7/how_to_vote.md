@@ -50,9 +50,10 @@ Each consecutive week you vote, you’ll earn an increasing number of points:
 - **Week 2** = +2 points  
 - **Week 3** = +3 points  
 - **Week 4** = +4 points  
-- **Week 5** = +5 points  
+- **Week 5** = +5 points
+- **Over 200 Weeks** = +6 points
 
-That’s a total of **15 bonus points** available if you vote every week!  
+That’s a total of **21 bonus points** available if you vote every week!  
 
 > 🧠 **Example**: If you vote only in Week 1 and Week 3, you’ll get just **1 + 1 = 2 bonus points**.
 
