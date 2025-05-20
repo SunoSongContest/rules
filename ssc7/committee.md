@@ -52,10 +52,10 @@ and a German heart, she blends cultures into art — now joining SSC for the fir
 
 > Contact him on discord: `@panthera_may`
 
-### 🪵 Flickerlog
+### 🥁 Flickerlog
 <img width="64" height="64" src="https://cdn.discordapp.com/avatars/1122896556656431114/b2e40967188ea75eb9667480093a855b.webp?size=128" />
 
-_Coming soon..._
+_The newest SSC team member and a true handpan enthusiast! Always experimenting with new sounds and genre blends, he’s a creative tinkerer who now brings his talents behind the scenes to help make the contest shine._
 
 > Contact him on discord: `@flickerlog`
 
