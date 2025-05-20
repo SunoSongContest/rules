@@ -17,8 +17,8 @@ This edition will bring music and creativity to a whole new level!
 
 Here’s what’s changing and what you can look forward to:
 
-* 🗓️ **Extended Registration Period**  
-  Artists now have a full month to sign up and submit their music.
+* 🗓️ **Extended Track's Production Period**  
+  Artists now have 3 entire weeks of pre-announce to produce a track and be ready to submit their music.
 
 * 📻 **Weekly Playlists Built Live**  
   Playlists will be created live during weekly streaming sessions—stay tuned and be part of the process!
