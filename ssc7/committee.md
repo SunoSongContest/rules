@@ -50,7 +50,7 @@ at heart, he'll be helping behind the scenes — and might even pop up on Seb’
 _A true storyteller, Panthera turns her vivid imagination into music inspired by the many lyrics and characters she’s created. With Latina roots 
 and a German heart, she blends cultures into art — now joining SSC for the first time, ready to bring her stories to life._
 
-> Contact him on discord: `@panthera_may`
+> Contact her on discord: `@panthera_may`
 
 ### 🥁 Flickerlog
 <img width="64" height="64" src="https://cdn.discordapp.com/avatars/1122896556656431114/b2e40967188ea75eb9667480093a855b.webp?size=128" />
