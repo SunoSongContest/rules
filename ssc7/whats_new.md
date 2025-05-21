@@ -5,7 +5,7 @@ permalink: /ssc7/whatsnew/
 parenturl: /ssc7/
 emoji: 🤯
 order: 1
-short_description: 1-month submission time, weeks live-streams randomized picks, hidden finalists during weeks, bonus points from voting and more surprises in store!
+short_description: 3 weeks submission time, live-streams randomized picks, hidden finalists during weeks, bonus points from voting and more surprises in store!
 classname: page
 tag: guide
 ---
@@ -24,7 +24,7 @@ Here’s what’s changing and what you can look forward to:
   Playlists will be created live during weekly streaming sessions—stay tuned and be part of the process!
 
 * 🕵️‍♂️ **Finalists Kept Under Wraps**  
-  Finalists will not be fully revealed until the very last week, keeping the suspense high!
+  Finalists will not be fully revealed until the very last week, keeping some mystery and allowing contestants more chances to reach the finals through active participation.
 
 * ⭐ **Earn Bonus Points by Voting**  
   Active voters throughout the weeks will be rewarded with additional points—your vote has more power than ever!

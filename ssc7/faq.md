@@ -90,7 +90,7 @@ A: Asking for votes directly or indirectly, exchanging votes, or any other attem
 
 Q: I have a question not covered in this FAQ. Who should I contact?
 
-A: Reach out to @JoshuaSodil, @Teemuth, or @JonathanKennedy via DM on Discord.
+A: Any committee's member from our Official Staff (more info <a href="../committee">here</a>)
 
 ---
 

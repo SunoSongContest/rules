@@ -20,7 +20,7 @@ tag: guide
   - 🗳️ Voting opens on Thursdays for 7 days  
 * 🧨 **Extra Rounds**: 1–2 weeks for songs over the 200 cap  
 * 🎉 **Break Week**: Fun, challenges, and cute surprises 💖  
-* 🏆 **Finals Week**: Starts August 25
+* 🏆 **Finals Week**: Starts August 25 (could change due to the variable number of songs exceeding 200s)
 
 ## 📅 Calendar
 
@@ -77,7 +77,7 @@ All the key dates below — don’t miss a beat! 🎶
 
 ### 🏁 Finals Week
 
-* `August 25` – Finals Week kicks off!
+* `August 25` – Finals Week kicks off! (could change due to the variable number of songs exceeding 200s)
 
 ## 📥 Submission Period
 
@@ -110,6 +110,8 @@ Let’s take a break before the finals! One week to relax, hang out, and enjoy f
 
 ## 🏆 Finals Week
 
-All finalists will be featured in live streams.  
+All finalists will be featured in live streams.
 🗳️ Voting runs **Monday 12 p.m. UTC to Friday 12 p.m. UTC**.  
 Let’s crown the winners! 👑
+
+⚠️ *Note:* Finals start time could vary during the contest, because it depends mainly on the number of songs exceeding the 200s from the standard 5 weeks!
