@@ -24,7 +24,7 @@ Here’s what’s changing and what you can look forward to:
   Playlists will be created live during weekly streaming sessions—stay tuned and be part of the process!
 
 * 🕵️‍♂️ **Finalists Kept Under Wraps**  
-  Finalists will not be fully revealed until the very last week, keeping the suspense high!
+  Finalists will not be fully revealed until the very last week, keeping some mystery and allowing contestants more chances to reach the finals through active participation.
 
 * ⭐ **Earn Bonus Points by Voting**  
   Active voters throughout the weeks will be rewarded with additional points—your vote has more power than ever!
