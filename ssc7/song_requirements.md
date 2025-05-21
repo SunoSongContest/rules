@@ -64,8 +64,8 @@ Follow these rules so we can all enjoy the music. **Songs or participants that v
 
 ### 🚫 11. No Other Creator Challenges  
   To avoid overlap with **official Suno challenges**, SSC7 will **not accept** songs made for:
-  - Timbaland Remix Challenge  
-  - Halloween specials  
+  - Suno Official Challenges
+  - Community Challenges
   - Or any other branded creator contests
 
 Stick to the rules, and let’s make SSC7 the best one yet! 🎉
