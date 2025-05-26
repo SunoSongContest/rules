@@ -68,4 +68,14 @@ Follow these rules so we can all enjoy the music. **Songs or participants that v
   - Community Challenges
   - Or any other branded creator contests
 
+### 🎹 12. Suno Features
+  As per Suno's current features, those rules will apply:
+  - Remix are allowed, but only if the remixes source song (the song it has been generated from) is from the same author of the remix, and the original song has not been used in a previous SSC contest, be it in the main contest or a challenge
+  - Uploads are allowed, but ONLY if they are used to generate a song in Suno from it. Songs made outside of Suno and uploaded are not accepted
+
+  Which means:
+  > You can freely use the Suno Remix features on your own songs to create something from it. You can use Replace Section, Cover, Use Style & Lyrics and all the other features of a song that was made solely by you to create something different from it and use it for the SSC
+
+  > You can upload an audio that was created outside of Suno by yourself, like in a DAW or with real instruments, and use it to create a song in Suno with it
+
 Stick to the rules, and let’s make SSC7 the best one yet! 🎉
