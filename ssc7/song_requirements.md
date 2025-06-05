@@ -78,4 +78,8 @@ Follow these rules so we can all enjoy the music. **Songs or participants that v
 
   > You can upload an audio that was created outside of Suno by yourself, like in a DAW or with real instruments, and use it to create a song in Suno with it
 
+### 👤 13. Contests' Persona
+  The usage of a Persona, that is created from any kind of song from an official Suno contest is not allowed in any kind or form.
+  The original song, a copyrighted work, will always play part in that persona and we can never guarantee that there won't be claims or take down requests because some beats or lines represent the original song.
+
 Stick to the rules, and let’s make SSC7 the best one yet! 🎉
