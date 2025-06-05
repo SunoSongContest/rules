@@ -21,7 +21,7 @@ Follow these rules so we can all enjoy the music. **Songs or participants that v
   Do **not** modify your song (lyrics, title, image, etc.) during the contest, unless explicitly required by the staff.
 
 ### 🌍 3. Language & Content
-  - Your song can be an **instrumental** one or a **singed** one.
+  - Your song can be an **instrumental** (only) one or one that includes **vocals generated from lyrics**.
   - If your songs has singed lyrics, the **language must be recognizable by Google Translate**.  
   - **Mixed languages** are allowed.
 
@@ -77,5 +77,9 @@ Follow these rules so we can all enjoy the music. **Songs or participants that v
   > You can freely use the Suno Remix features on your own songs to create something from it. You can use Replace Section, Cover, Use Style & Lyrics and all the other features of a song that was made solely by you to create something different from it and use it for the SSC
 
   > You can upload an audio that was created outside of Suno by yourself, like in a DAW or with real instruments, and use it to create a song in Suno with it
+
+### 👤 13. Contests' Persona
+  The usage of a Persona, that is created from any kind of song from an official Suno contest is not allowed in any kind or form.
+  The original song, a copyrighted work, will always play part in that persona and we can never guarantee that there won't be claims or take down requests because some beats or lines represent the original song.
 
 Stick to the rules, and let’s make SSC7 the best one yet! 🎉
