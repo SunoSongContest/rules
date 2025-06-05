@@ -21,7 +21,7 @@ Follow these rules so we can all enjoy the music. **Songs or participants that v
   Do **not** modify your song (lyrics, title, image, etc.) during the contest, unless explicitly required by the staff.
 
 ### 🌍 3. Language & Content
-  - Your song can be an **instrumental** one or a **singed** one.
+  - Your song can be an **instrumental** (only) one or one that includes **vocals generated from lyrics**.
   - If your songs has singed lyrics, the **language must be recognizable by Google Translate**.  
   - **Mixed languages** are allowed.
 
