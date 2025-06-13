@@ -27,12 +27,12 @@ Instead of releasing the weekly playlist all at once, we will **draw the songs l
 ### 📆 Contest Timeline
 
 Just like in SSC6, the contest will span **5 weeks**.  
-Due to this structure, **only the first 200 accepted songs** will be spread across the weekly playlists (40 songs per week).
+Due to this structure, **only the first 200 - randomly - accepted songs** will be spread across the weekly playlists (40 songs per week).
 
 
 ### 🟡 What Happens After 200 Songs?
 
-Any songs **accepted after the first 200** will not be left out!
+Any songs **accepted after the first - randomly - 200** will not be left out!
 
 These songs will be added to a **special "Bonus Playlist"**, and they will get their **own dedicated voting phase**.
 They won't be streamed as the 200 songs in previous weeks, but still it's a way to give everyone the possibility to participate in SSC7.
