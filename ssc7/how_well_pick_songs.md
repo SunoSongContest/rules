@@ -26,7 +26,7 @@ Instead of releasing the weekly playlist all at once, we will **draw the songs l
 
 ### 📆 Contest Timeline
 
-Just like in SSC7, the contest will span **5 weeks**.  
+Just like in SSC6, the contest will span **5 weeks**.  
 Due to this structure, **only the first 200 accepted songs** will be spread across the weekly playlists (40 songs per week).
 
 
