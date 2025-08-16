@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Song Deck Picker with Shuffle SSC Version</title>
+<style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+      color: #333; /* Default text color for light mode */
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      text-align: center;
+    }
+
+    /* Input/Output Textareas */
+    #card-input, #exported-output-text {
+      width: 100%;
+      padding: 10px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+      background-color: #fff; /* Default light mode background */
+      color: #333; /* Default light mode text */
+      border: 1px solid #ccc; /* Default light mode border */
+    }
+    #exported-output-text { 
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    /* --- General Button Styles --- */
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      background-color: #f0f0f0; /* Lighter background for light mode buttons */
+      color: #333; /* Darker text for light mode buttons */
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      transition: background-color 0.3s ease;
+      display: inline-block; /* Default to inline-block for flexible layout */
+      margin: 5px; /* Small default margin between elements */
+    }
+    button:hover {
+        background-color: #e0e0e0; /* Slightly darker on hover */
+    }
+    
+    /* --- Specific Button Styles & Layout --- */
+
+    /* Large and Centered Buttons */
+    #load-cards-api-button,
+    #parse-button,
+    #shuffle-button {
+      font-size: 1.2rem;
+      padding: 12px 25px;
+      width: auto;
+      min-width: 200px;
+      display: block; /* Force to own line */
+      margin: 15px auto; /* Centered */
+    }
+
+    /* Export & Save Buttons (Part of an inline row) */
+    #copy-picked-songs-to-clipboard-button,
+    #save-picked-songs-to-sheet-button {
+        font-size: 1rem; /* Standard button size */
+        padding: 10px 20px;
+        margin: 5px; /* Adjust margin around these buttons */
+    }
+
+    /* Small and Left-Justified Buttons (using a container for control) */
+    .controls-left button { /* Apply to buttons within this class */
+      font-size: 0.7rem;
+      padding: 5px 10px;
+      margin: 5px 0; /* Align to left */
+      display: block; /* Each on its own line */
+    }
+
+    /* Copy Displayed Text button (inside exported output) */
+    #copy-exported-output {
+        font-size: 0.95rem;
+        padding: 8px 15px;
+        display: block; /* On its own line */
+        margin: 10px auto 0 auto; /* Centered below text area */
+    }
+
+    /* Spinner used for parsing/link lookups */
+    .spinner {
+        display: none;
+        width: 18px;
+        height: 18px;
+        border: 3px solid rgba(0,0,0,0.18);
+        border-top-color: #333;
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+        vertical-align: middle;
+        margin-left: 8px;
+    }
+    .spinner.show { display: inline-block; }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    body.dark-mode .spinner {
+        border-top-color: #e0e0e0;
+        border: 3px solid rgba(255,255,255,0.12);
+    }
+
+    /* --- Container Layouts --- */
+    .button-group-center { /* For #load-cards-api-button and #card-count-display */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+    .button-group-center #load-cards-api-button {
+        margin: 0 10px 0 0; /* Adjust margin within flex container */
+    }
+    .button-group-center #card-count-display {
+        font-size: 1.1rem;
+    }
+
+    .export-actions-row { /* Container for all export-related elements */
+        display: flex;
+        align-items: center;
+        justify-content: center; /* Center the entire row horizontally */
+        flex-wrap: wrap; /* Allow wrapping on smaller screens */
+        gap: 10px; /* Space between elements */
+        margin-bottom: 20px;
+    }
+    .export-actions-row label {
+        white-space: nowrap;
+        font-weight: bold;
+    }
+    .export-actions-row select {
+        padding: 8px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        background-color: #fff;
+        color: #333;
+        font-size: 1rem;
+        width: auto; /* Width based on content, not fixed */
+        min-width: 120px; /* Minimum width for readability */
+        text-align: center;
+        margin: 0; /* Reset margin from general select rules */
+    }
+
+    /* Basic Grid/Flex Containers */
+    .grid-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+    .stack-container {
+      position: relative;
+      width: 300px;
+      height: 300px;
+      margin: 20px auto;
+    }
+    .card-wrapper {
+      position: static;
+      transition: transform 0.8s ease;
+    }
+    .stack-container .card-wrapper {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .card {
+      width: 150px;
+      height: 220px;
+      perspective: 1000px;
+      margin: 5px;
+      border-radius: 10px;
+      box-sizing: border-box;
+      transform-style: preserve-3d;
+      transform: translateZ(0); /* Ensure hardware acceleration */
+    }
+
+    /* The actual flip container */
+    .card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.8s;
+      transform-style: preserve-3d;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .card.face-down .card-inner {
+      transform: rotateY(180deg);
+    }
+    .card-front, .card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #ccc;
+    }
+    .card-front {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px;
+      box-sizing: border-box;
+      transform: rotateY(0);
+      background: #fff;
+    }
+    .card-front img {
+	  width: 100%;
+	  aspect-ratio: 1 / 1;
+	  object-fit: cover;
+	  border-radius: 4px;
+	}
+    .card-front h3 {
+      font-size: 1.1rem;
+      margin: 10px 0 5px;
+      text-align: center;
+    }
+    .card-front p {
+      font-size: 0.9rem;
+      margin: 0;
+      text-align: center;
+    }
+    .card-back {
+      background: #333 url("cardback.png") center/cover no-repeat;
+      transform: rotateY(180deg);
+      border: 2px solid #555;
+    }
+
+	/* NEW: Card Dealing Animations */
+    /* Start cards off-screen, scaled down, and slightly rotated */
+    .revealed-container .card-wrapper {
+        opacity: 0;
+        transform: translateY(100px) rotate(-10deg) scale(0.8);
+        transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+    }
+
+    /* Animation for cards flying in */
+    .revealed-container .card-wrapper.dealt {
+        opacity: 1;
+        transform: translateY(0) rotate(0deg) scale(1);
+    }
+
+    /* Keep individual card-wrapper transition for arrow behavior */
+    .card-wrapper {
+      transition: transform 0.8s ease; /* Maintain this for highlight scale/movement */
+    }
+
+
+	.selection-arrow {
+	  position: absolute;
+	  top: -35px;
+	  width: 48px;
+	  height: 48px;
+	  background-image: url('Arrow.png');
+	  background-size: contain;
+	  background-repeat: no-repeat;
+	  background-position: center;
+	  transition: left 0.2s ease;
+	  z-index: 999;
+	}
+	.revealed-container {
+	  display: flex;
+	  justify-content: center;
+	  gap: 20px;
+	  position: relative;
+	  margin-top: 20px;
+	}
+	.highlight {
+	  outline: 4px solid gold;
+	  transform: scale(1.05);
+	  z-index: 101;
+      border-radius: 12px;
+	}
+      #discard-count-display {
+        font-weight: normal;
+        font-size: 1rem;
+        color: #666;
+        vertical-align: middle;
+    }
+
+    /* --- DARK MODE STYLES --- */
+	body.dark-mode {
+	  background-color: #121212;
+	  color: #e0e0e0;
+	}
+
+	body.dark-mode .container {
+	  background: #1e1e1e;
+	  box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+	}
+
+    /* Input/Output Textareas in Dark Mode */
+    body.dark-mode #card-input,
+    body.dark-mode #exported-output-text {
+        background-color: #2a2a2a;
+        color: #e0e0e0;
+        border: 1px solid #444;
+    }
+    /* Select Dropdown in Dark Mode */
+    body.dark-mode select {
+        background-color: #2a2a2a;
+        color: #e0e0e0;
+        border: 1px solid #444;
+    }
+
+    /* All Buttons in Dark Mode */
+    body.dark-mode button {
+        background-color: #333; /* Dark background */
+        color: #e0e0e0; /* Light text */
+        border: 1px solid #555; /* Slightly lighter border */
+    }
+	body.dark-mode button:hover {
+	  background-color: #444; /* Darker on hover */
+	}
+
+    /* Exported Output Container in Dark Mode */
+    body.dark-mode #exported-output-container {
+        background-color: #1a1a1a;
+        border: 1px solid #333;
+    }
+    
+	body.dark-mode .card-front {
+	  background: #2a2a2a; /* Card front background in dark mode */
+	  box-shadow: 2px 2px 5px rgba(255,255,255,0.05); 
+       border: 2px solid #444; /* Darker border for the front */
+	}
+
+	body.dark-mode .card.face-down .card-inner {
+	  box-shadow: 0 4px 8px rgba(0,0,0,0.5); /* Deeper shadow for inner flip in dark mode */
+	}
+	body.dark-mode .card-back {
+	  border: 2px solid #888; 
+	}
+	
+	/* Stacked Cards in Dark Mode */
+	body.dark-mode .stack-container .card {
+	  background: transparent;
+	  box-shadow: none; /* Shadow is on .card-inner now */
+	}
+	body.dark-mode .stack-container .card-inner {
+	  background: transparent;
+	}
+	body.dark-mode .stack-container .card-back {
+	  /* No changes needed specific to stack, already styled */
+	}
+	body.dark-mode .stack-container .card-front {
+	  background-color: transparent;
+	  box-shadow: none;
+	}
+	body.dark-mode .stack-container .card.face-down .card-front {
+	  box-shadow: none !important;
+	  background: transparent !important;
+	}
+	
+	
+	.logo-image {
+	  width: 100%;
+	  height: auto;
+	  display: block;
+	  margin: 0 auto;
+	  /*border-radius: 50%;
+	  transform: rotate(-5deg);
+    -webkit-mask-image: radial-gradient(black 60%, transparent 70%);
+	  mask-image: radial-gradient(black 60%, transparent 70%);*/
+	}
+  </style>
+
+
+</head>
+<body>
+  <div class="container">
+	<img src="SSC7-logo.png" class="logo-image">
+    <h1>Week 1</h1>
+	<div id="input-section">
+    <!-- API Load Controls -->
+    <div class="api-controls">
+        <div class="button-group-center"> <!-- New class for centering -->
+            <button id="load-cards-api-button">Load Cards from Sheet</button>
+            <span id="loading-indicator" style="display: none; margin-left: 10px;">⏳ Loading...</span>
+            <span id="card-count-display" style="margin-left: 10px; font-weight: bold;"></span>
+        </div>
+    </div>
+    <!-- END API CONTROLS -->
+
+
+		<textarea id="card-input" placeholder="Enter cards, one per line:
+ArtistName: John Doe | Title: Masterpiece | Image: url | Link: url | Color: #FF0000 | Comment: insightful words or input just the song link" rows="5"></textarea>
+		<button id="parse-button">Add Cards Manually</button><span id="parse-spinner" class="spinner" aria-hidden="true" title="Loading"></span>
+		
+        <!-- New row for export actions -->
+        <div class="export-actions-row">
+            <!-- Button to copy picked songs to clipboard, no API -->
+            <button id="copy-picked-songs-to-clipboard-button">Copy Picked Songs to Clipboard</button>
+
+            <!-- Elements for Google Sheet save -->
+            <label for="week-number-select">Week Number:</label>
+            <select id="week-number-select" aria-label="Select week number">
+                <option value="0">Select Week...</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="bonus">Bonus</option>
+            </select>
+            <button id="save-picked-songs-to-sheet-button">Save Picked Songs to Sheet</button> 
+        </div>
+	</div>
+
+    <!-- Small left-justified buttons -->
+    <div class="controls-left">
+        <button id="toggle-inputs-button">🙈 Hide Input Section</button>
+    </div>
+
+    <!-- Centered Shuffle & Draw button -->
+    <button id="shuffle-button">Shuffle &amp; Draw</button>
+
+	<div id="revealed-container" class="revealed-container" style="display: none;"></div>
+	<br>
+	<div id="card-comment" style="text-align: center; margin-top: 10px; font-style: italic; display: none;"></div>
+    <div id="deck-container" class="grid-container"></div>
+    <h2>Discard Pile (Picked Songs) <span id="discard-count-display"></span></h2>
+    <div id="discard-container" class="grid-container"></div>
+    <!-- Container for exported text output -->
+    <div id="exported-output-container" style="display: none; margin-top: 20px; padding: 10px; border: 1px solid #ccc;">
+        <h3>Exported Picked Songs (from Sheet Save):</h3>
+        <pre id="exported-output-text"></pre>
+        <button id="copy-exported-output">Copy Displayed Text</button>
+    </div>
+     <div class="controls-left">
+     <button id="toggle-theme-button">🌙 Toggle Dark Mode</button>
+     </div>
+  </div>
+  
+</body>
+
+<script>
+    let deck = [];
+    let discardPile = [];
+	let hasShuffled = false;
+    const placeholderImage = 'https://via.placeholder.com/150';
+	
+    // Backend API Endpoint
+    const BACKEND_URL = 'https://checktrend.info/api';
+
+	// Helper function:
+	function extractField(line, key) {
+		const match = new RegExp(`${key}:\\s*([^|]+)`);
+		const found = line.match(match);
+		return found ? found[1].trim() : null;
+	}
+
+	// --- New helpers for URL-only input support ---
+	// Detects Suno links in the forms:
+	//   - https://suno.com/song/<id>
+	//   - https://suno.com/s/<short>
+	// Also matches links without protocol ("suno.com/...")
+	function isSunoLink(s) {
+		if (!s) return false;
+		return /(https?:\/\/)?(www\.)?suno\.com\/(song|s)\/[A-Za-z0-9_-]+/i.test(s.trim());
+	}
+
+	// Ensure link has protocol and trim trailing slashes
+	function normalizeSunoLink(s) {
+		if (!s) return s;
+		let link = s.trim();
+		if (!/^https?:\/\//i.test(link)) link = 'https://' + link;
+		return link.replace(/\/+$/, '');
+	}
+
+	// Fetch song metadata from backend endpoint /getsonginfo
+	// Expected GET: `${BACKEND_URL}/getsonginfo?url=${encodeURIComponent(link)}`
+	// Minimal successful response JSON (only what's needed for the card):
+	// {
+	//   "title": "Masterpiece",
+	//   "artist": "John Doe",
+	//   "image": "https://cdn.suno.com/artwork/song-id.jpg",
+	//   "link": "https://suno.com/song/song-id-123"
+	// }
+	// If the backend can't find the song or an error occurs, return a non-2xx status
+	// with a JSON body like: { "error": "Song not found or invalid URL" }
+	// Note: short ids, duration, album, release_date, or source are NOT required
+	// and should not be relied upon by the client for the deck picker UI.
+	async function fetchSongInfo(url, timeoutMs = 60000) { // default timeout increased to 60s
+		if (!url) return null;
+		const normalized = normalizeSunoLink(url);
+		try {
+			const controller = new AbortController();
+			const id = setTimeout(() => controller.abort(), timeoutMs);
+			const res = await fetch(`${BACKEND_URL}/getsonginfo?url=${encodeURIComponent(normalized)}`, {
+				signal: controller.signal
+			});
+			clearTimeout(id);
+			if (!res.ok) {
+				console.warn('getsonginfo returned not-ok status', res.status, normalized);
+				return null;
+			}
+			const data = await res.json();
+			return data;
+		} catch (err) {
+			console.warn('fetchSongInfo error for', normalized, err);
+			return null;
+		}
+	}
+
+    // Helper to determine contrasting text color (black or white)
+    // Based on W3C luminance contrast algorithm
+    function getContrastColor(hexColor) {
+        if (!hexColor || !/^#([A-Fa-f0-9]{3}){1,2}$/.test(hexColor)) {
+            return 'black'; 
+        }
+
+        let r = 0, g = 0, b = 0;
+        if (hexColor.length === 4) {
+            r = parseInt(hexColor[1] + hexColor[1], 16);
+            g = parseInt(hexColor[2] + hexColor[2], 16);
+            b = parseInt(hexColor[3] + hexColor[3], 16);
+        } else if (hexColor.length === 7) {
+            r = parseInt(hexColor.substring(1, 3), 16);
+            g = parseInt(hexColor.substring(3, 5), 16);
+            b = parseInt(hexColor.substring(5, 7), 16);
+        }
+
+        let R = r / 255;
+        let G = g / 255;
+        let B = b / 255;
+
+        R = (R <= 0.03928) ? R / 12.92 : Math.pow((R + 0.055) / 1.055, 2.4);
+        G = (G <= 0.03928) ? G / 12.92 : Math.pow((G + 0.055) / 1.055, 2.4);
+        B = (B <= 0.03928) ? B / 12.92 : Math.pow((B + 0.055) / 1.055, 2.4);
+
+        const luminance = (0.2126 * R) + (0.7152 * G) + (0.0722 * B);
+
+        return (luminance > 0.179) ? 'black' : 'white';
+    }
+
+
+    // Load Cards from API
+    document.getElementById('load-cards-api-button').addEventListener('click', async function() {
+        const button = this;
+        const loadingIndicator = document.getElementById('loading-indicator');
+        button.disabled = true;
+        loadingIndicator.style.display = 'inline';
+        try {
+            deck = []; // Clear existing deck before loading from API
+            discardPile = []; // Also clear discard pile on new load
+            hasShuffled = false; // Reset shuffle state
+
+            const response = await fetch(`${BACKEND_URL}/cards?placeholderImage=${encodeURIComponent(placeholderImage)}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            // Map the loaded cards to the internal deck format
+            data.cards.forEach(card => {
+                deck.push({ ...card, id: Date.now() + Math.random() }); // Ensure unique ID for deck management
+            });
+
+            updateDeckDisplay('grid');
+            updateDiscardDisplay();
+
+            // Display card count verification
+            document.getElementById('card-count-display').textContent = `Cards Loaded: ${deck.length}`;
+            alert(`Deck loaded with ${deck.length} cards from API!`);
+
+        } catch (error) {
+            console.error('Error loading cards from API:', error);
+            alert(`Failed to load cards from API: ${error.message}. Check console.`);
+        } finally {
+            button.disabled = false;
+            loadingIndicator.style.display = 'none';
+        }
+    });
+
+    // Manual Card Input (parse-button)
+    document.getElementById('parse-button').addEventListener('click', async function() {
+  const button = this;
+  const originalText = button.textContent;
+  const spinner = document.getElementById('parse-spinner');
+  if (spinner) spinner.classList.add('show');
+
+  button.disabled = true;
+  button.textContent = 'Parsing...';
+
+  const inputText = document.getElementById('card-input').value.trim();
+  if (!inputText) {
+   alert("Please enter at least one card.");
+   button.disabled = false;
+   button.textContent = originalText;
+   if (spinner) spinner.classList.remove('show');
+   return;
+  }
+
+  const lines = inputText.split('\n').map(l => l.trim()).filter(Boolean);
+  const urlsToFetch = []; // URL-only lookups (strings)
+  const manualCards = []; // cards parsed directly from key:value input
+  
+  for (const line of lines) {
+   // If the line looks like a Suno link and does not contain explicit key:value
+   // fields like "ArtistName:" or "Title:", treat it as a URL-only line and queue
+   // it for batched fetching. This avoids firing hundreds of concurrent requests.
+   if (isSunoLink(line) && !/(?:ArtistName|Artist|Title)\s*:/i.test(line)) {
+    const url = normalizeSunoLink(line);
+    urlsToFetch.push(url);
+   } else {
+    // Fallback / existing manual parsing logic (supports key:value | key:value)
+    const card = {
+    	id: Date.now() + Math.random(), // Unique ID
+    	artist: extractField(line, 'ArtistName') || extractField(line, 'Artist') || null,
+    	title: extractField(line, 'Title') || null,
+    	image: extractField(line, 'Image') || null,
+    	link: extractField(line, 'Link') || null,
+    	color: extractField(line, 'Color') || null,
+    	comment: extractField(line, 'Comment') || null
+    };
+ 
+    // Frontend fallbacks for manual input
+    if (!card.color) {
+    	card.color = "#" + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+    }
+    if (!card.image) {
+    	card.image = placeholderImage;
+    }
+ 
+    if (!card.artist || !card.title) {
+    	console.warn("Skipping line due to missing Artist or Title:", line);
+    	continue;
+    }
+    manualCards.push(card);
+   }
+  }
+
+  // Resolve all fetches using a concurrency-limited batch runner
+  let fetchedCards = [];
+  if (urlsToFetch.length > 0) {
+    const concurrency = 8;
+    const timeoutMsForFetch = 60000; // 60s timeout per request as requested
+    
+    // Batched fetch helper (returns array aligned with input URLs)
+    async function fetchUrlsConcurrently(urls, concurrency, timeoutMs, spinner) {
+      const results = new Array(urls.length).fill(null);
+      let nextIndex = 0;
+      let completed = 0;
+      
+      async function worker() {
+        while (true) {
+          const i = nextIndex++;
+          if (i >= urls.length) break;
+          const url = urls[i];
+          try {
+            const info = await fetchSongInfo(url, timeoutMs);
+            if (info) {
+              results[i] = {
+                id: Date.now() + Math.random(),
+                artist: info.artist || info.artist_name || null,
+                title: info.title || info.name || null,
+                image: info.image || info.img_large_url || info.img_url || placeholderImage,
+                link: info.link || info.url || url,
+                color: info.color || ("#" + Math.floor(Math.random()*16777215).toString(16).padStart(6,'0')),
+                comment: info.comment || null
+              };
+            } else {
+              results[i] = null;
+            }
+          } catch (err) {
+            console.warn('fetchSongInfo failed for', url, err);
+            results[i] = null;
+          } finally {
+            completed++;
+            if (spinner) spinner.title = `Loading (${completed}/${urls.length})`;
+          }
+        }
+      }
+      
+      const workers = [];
+      const workerCount = Math.min(concurrency, urls.length);
+      for (let w = 0; w < workerCount; w++) workers.push(worker());
+      await Promise.all(workers);
+      return results;
+    }
+    
+    if (spinner) spinner.title = `Loading (0/${urlsToFetch.length})`;
+    const fetchedResults = await fetchUrlsConcurrently(urlsToFetch, concurrency, timeoutMsForFetch, spinner);
+    for (const f of fetchedResults) {
+      if (!f) continue;
+      if (!f.artist || !f.title) {
+        console.warn('Skipping fetched entry due to missing artist/title', f);
+        continue;
+      }
+      fetchedCards.push(f);
+    }
+  }
+
+  // Add parsed cards to deck and update UI
+  const toAdd = [...manualCards, ...fetchedCards];
+  if (toAdd.length === 0) {
+   alert('No valid cards were parsed or fetched. Check input and try again.');
+  } else {
+   deck.push(...toAdd);
+  }
+
+  document.getElementById('card-input').value = '';
+  updateDeckDisplay('grid');
+  document.getElementById('card-count-display').textContent = `Cards Loaded: ${deck.length}`;
+
+  button.disabled = false;
+  button.textContent = originalText;
+  if (spinner) {
+    spinner.classList.remove('show');
+    spinner.title = 'Loading';
+  }
+ });
+
+    // NEW: Copy Picked Songs to Clipboard (for Discord .txt paste)
+    document.getElementById('copy-picked-songs-to-clipboard-button').addEventListener('click', async function() {
+        if (discardPile.length === 0) {
+            alert("No songs have been picked (in the discard pile) to copy.");
+            return;
+        }
+
+        const exportedText = discardPile.map(card => {
+            const fields = [
+                `ArtistName: ${card.artist}`,
+                `Title: ${card.title}`
+            ];
+            if (card.image && card.image !== placeholderImage) fields.push(`Image: ${card.image}`);
+            if (card.link) fields.push(`Link: ${card.link}`);
+            if (card.color) fields.push(`Color: ${card.color}`);
+            if (card.comment) fields.push(`Comment: ${card.comment}`);
+            return fields.join(' | ');
+        }).join('\n');
+        // The Clipboard API is only available in secure contexts (HTTPS or localhost).
+        // This check prevents an error when running from a file:// URL.
+        if (!navigator.clipboard) {
+            prompt("Failed to copy automatically. Here are the songs:", exportedText);
+            console.warn("Clipboard API not available (not a secure context).");
+            return;
+        }
+        navigator.clipboard.writeText(exportedText).then(() => {
+            alert("Picked songs copied to clipboard! You can now paste them.");
+        }).catch(err => {
+            console.error("Failed to copy to clipboard:", err);
+            prompt("Failed to copy. Here are the songs:", exportedText);
+        });
+    });
+
+
+    // Save Picked Songs to Google Sheet via API
+    document.getElementById('save-picked-songs-to-sheet-button').addEventListener('click', async function () {
+        const weekNumberSelect = document.getElementById('week-number-select');
+        const weekNumber = weekNumberSelect.value;
+
+        // Validation for week number
+        if (weekNumber === "0") {
+            alert("Please select a valid week number (1-5 or Bonus) before saving to sheet.");
+            return;
+        }
+
+        if (discardPile.length === 0) {
+            alert("No songs have been picked (in the discard pile) to save to sheet.");
+            return;
+        }
+
+        // --- Generate Text Output for local display (always) ---
+        const displayedText = discardPile.map(card => `${card.artist},${card.title}`).join('\n');
+        document.getElementById('exported-output-container').style.display = 'block';
+        document.getElementById('exported-output-text').textContent = "Attempting to save the following songs to sheet:\n" + displayedText;
+        
+        // --- Attempt to Save to Google Sheet via API ---
+        try {
+            const sheetSaveResponse = await fetch(`${BACKEND_URL}/cards`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    updated_cards: discardPile, // Send the cards from discardPile
+                    week_number: weekNumber,
+                }),
+            });
+
+            if (!sheetSaveResponse.ok) {
+                const errorData = await sheetSaveResponse.json();
+                throw new Error(errorData.error || `HTTP error! status: ${sheetSaveResponse.status}`);
+            }
+            const data = await sheetSaveResponse.json();
+            
+            // Update local display with success message
+            document.getElementById('exported-output-text').textContent = `Save Successful! Server message: ${data.message}\n\nSongs saved to sheet:\n` + displayedText;
+            alert(`Save Successful! Sheet updated for Week ${weekNumber}.`);
+
+            // If API sheet save is successful, clear discard pile and update UI
+            discardPile = [];
+            updateDiscardDisplay();
+            //weekNumberSelect.value = "0"; // Reset week selector
+
+        } catch (error) {
+            console.error('Error saving cards to Google Sheet API:', error);
+            // Crucial alert if sheet update fails
+            document.getElementById('exported-output-text').textContent = `CRITICAL ERROR: Failed to save to Google Sheet: ${error.message}\n\nAttempted to save the following songs:\n` + displayedText;
+            alert(`CRITICAL ERROR: Failed to save picked songs to Google Sheet: ${error.message}.\n\nPlease check your backend logs and internet connection.`);
+        }
+    });
+
+    // Helper for direct copy from the displayed output (inside exported-output-container)
+    document.getElementById('copy-exported-output').addEventListener('click', function() {
+        const textToCopy = document.getElementById('exported-output-text').textContent;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            alert("Copied displayed text to clipboard!");
+        }).catch(err => {
+            console.error("Failed to copy:", err);
+            alert("Failed to copy displayed text to clipboard. Please select and copy manually.");
+        });
+    });
+
+
+    function updateDeckDisplay(mode = 'grid') {
+      const deckContainer = document.getElementById('deck-container');
+      deckContainer.innerHTML = '';
+      deckContainer.className = mode === 'grid' ? 'grid-container' : 'stack-container';
+
+      deck.forEach(card => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'card-wrapper';
+        
+        // Determine text color based on card color
+        const textColor = getContrastColor(card.color);
+        const cardFrontStyle = `background-color: ${card.color}; color: ${textColor};`;
+
+        wrapper.innerHTML = `
+          <div class="card${hasShuffled ? ' face-down' : ''}" data-id="${card.id}">
+            <div class="card-inner">
+				${card.link ? `<a href="${card.link}" target="_blank" style="text-decoration: none; color: inherit; display: contents;">` : ''}
+              <div class="card-front" style="${cardFrontStyle}">
+				  <img src="${card.image}" alt="${card.title || 'No Title'}">
+				  <h3>${card.title ? (card.title.length > 23 ? card.title.slice(0, 20) + '...' : card.title) : 'Unknown Title'}</h3>
+				  <p>${card.artist || 'Unknown Artist'}</p>
+				</div>
+                <div class="card-back"></div> <!-- No text needed for image back -->
+				${card.link ? `</a>` : ''}
+
+            </div>
+          </div>`;
+        deckContainer.appendChild(wrapper);
+      });
+      document.getElementById('card-count-display').textContent = `Cards Loaded: ${deck.length}`;
+    }
+
+    function updateDiscardDisplay() {
+      const discardContainer = document.getElementById('discard-container');
+      discardContainer.innerHTML = '';
+      discardPile.forEach(card => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'card-wrapper';
+
+        // Determine text color for discard pile cards too
+        const textColor = getContrastColor(card.color);
+        const cardFrontStyle = `background-color: ${card.color}; color: ${textColor};`;
+
+        wrapper.innerHTML = `
+          <div class="card">
+            <div class="card-inner">
+				${card.link ? `<a href="${card.link}" target="_blank" style="text-decoration: none; color: inherit; display: contents;">` : ''}
+				<div class="card-front" style="${cardFrontStyle}">
+				  <img src="${card.image}" alt="${card.title || 'No Title'}">
+				  <h3>${card.title ? (card.title.length > 23 ? card.title.slice(0, 20) + '...' : card.title) : 'Unknown Title'}</h3>
+				  <p>${card.artist || 'Unknown Artist'}</p>
+				</div>
+                <div class="card-back"></div> <!-- No text needed for image back -->
+				${card.link ? `</a>` : ''}
+            </div>
+          </div>`;
+        discardContainer.appendChild(wrapper);
+      });
+      document.getElementById('discard-count-display').textContent = `(${discardPile.length})`;
+    }
+	
+	let revealedCards = [];
+  let pendingSelection = false;
+	let handleClickOutside = null; // To hold the event listener reference
+
+	function revealFiveCardsWithArrow() {
+    // If a selection is pending from a previous round, finalize it first.
+	  if (pendingSelection) {
+		  const highlightedWrapper = document.querySelector("#revealed-container .card-wrapper.highlight");
+		  if (highlightedWrapper) {
+			  const selectedId = Number(highlightedWrapper.querySelector(".card").dataset.id);
+			  const selectedCard = revealedCards.find(c => c.id === selectedId);
+			  handleFinalize(selectedCard);
+		  } else {
+			  // Fallback: If no card is highlighted, cancel and return all revealed cards to the deck.
+			  handleFinalize(null);
+		  }
+	  }
+	  if (deck.length === 0) {
+		alert("No more cards in the deck.");
+		return;
+	  }
+
+	  shuffleDeck();
+	  hasShuffled = true;
+	  updateDeckDisplay('stack'); // Show deck as stacked before dealing
+
+	  const container = document.getElementById("revealed-container");
+	  container.innerHTML = '';
+	  container.style.display = 'flex'; // Make sure container is visible
+      
+      const amountToDraw = Math.min(deck.length, 5);
+      revealedCards = deck.splice(0, amountToDraw); // Draw cards from deck
+
+      let dealingPromises = [];
+
+	  revealedCards.forEach((card, index) => {
+		  const wrapper = document.createElement('div');
+		  wrapper.className = 'card-wrapper';
+		  wrapper.dataset.index = index;
+
+          // Determine text color for revealed cards
+          const textColor = getContrastColor(card.color);
+          const cardFrontStyle = `background-color: ${card.color}; color: ${textColor};`;
+
+		  wrapper.innerHTML = `
+			<div class="card" data-id="${card.id}">
+			  <div class="card-inner">
+				${card.link ? `<a href="${card.link}" target="_blank" style="text-decoration: none; color: inherit; display: contents;">` : ''}
+				<div class="card-front" style="${cardFrontStyle}">
+				  <img src="${card.image}" alt="${card.title || 'No Title'}">
+				  <h3>${card.title ? (card.title.length > 23 ? card.title.slice(0, 20) + '...' : card.title) : 'Unknown Title'}</h3>
+				  <p>${card.artist || 'Unknown Artist'}</p>
+				</div>
+                <div class="card-back"></div> <!-- No text needed for image back -->
+				${card.link ? `</a>` : ''}
+			  </div>
+			</div>`;
+		  container.appendChild(wrapper);
+
+          // Add 'dealt' class with a delay for staggered animation
+          const dealDelay = index * 100; // 100ms delay per card
+          dealingPromises.push(new Promise(resolve => {
+              setTimeout(() => {
+                  wrapper.classList.add('dealt');
+                  resolve();
+              }, dealDelay);
+          }));
+      });
+
+      // After all cards have been added to the DOM, wait for their animations to complete
+      // A safe duration for 5 cards at 100ms delay + 500ms transition is 5 * 100 + 500 = 1000ms
+      const totalAnimationTime = (amountToDraw - 1) * 100 + 500; // (num_cards - 1) * delay + transition_duration
+
+      setTimeout(() => {
+          if (revealedCards.length === 1) {
+            finalizeSelection(container.querySelector('.card-wrapper'));
+          } else {
+            startArrowSelection(container, revealedCards.length);
+          }
+      }, totalAnimationTime + 100); // Add a small buffer
+
+	}
+
+	function startArrowSelection(container, cardCount = 5) {
+	  const wrappers = container.querySelectorAll(".card-wrapper");
+	  let arrow = document.createElement("div");
+	  arrow.className = "selection-arrow";
+	  arrow.textContent = ""; // No text needed
+	  container.appendChild(arrow);
+
+	  let index = 0;
+	  let speed = 100;
+	  const slowdown = 1.1;
+	  const stopAt = Math.floor(Math.random() * cardCount);
+	  let loops = 0;
+	  let delay = speed;
+	  let tick;
+
+	  function moveArrow() {
+        // Ensure index is within bounds of wrappers, defensively
+        if (wrappers[index]) { 
+		    arrow.style.left = wrappers[index].offsetLeft + wrappers[index].offsetWidth / 2 - 24 + "px";
+        }
+
+		if (loops >= 3 && index === stopAt) {
+		  clearTimeout(tick);
+		  setTimeout(() => finalizeSelection(wrappers[stopAt]), 500);
+		  return;
+		}
+
+		index = (index + 1) % cardCount;
+		if (index === 0) loops++;
+
+		delay *= slowdown;
+		tick = setTimeout(moveArrow, delay);
+	  }
+
+	  // Start arrow movement slightly after all cards have settled in
+	  moveArrow();
+	}
+
+  	function handleFinalize(selectedCard) {
+		// If an old listener exists, remove it to prevent memory leaks and duplicate triggers.
+		if (handleClickOutside) {
+			document.removeEventListener("click", handleClickOutside);
+			handleClickOutside = null;
+		}
+
+		// If no card was selected (e.g., selection cancelled), put all revealed cards back into the deck.
+		if (!selectedCard) {
+			deck.push(...revealedCards);
+		} else {
+			// This logic finds the selected card and its duplicates, moves them to the discard pile,
+			// and ensures all other cards (including unselected revealed cards) are kept in the deck.
+			const otherCards = [...deck, ...revealedCards.filter(c => c.id !== selectedCard.id)];
+			const cardsToDiscard = [selectedCard];
+			const cardsToKeep = [];
+
+			for (const card of otherCards) {
+				if (card.artist === selectedCard.artist && card.title === selectedCard.title) {
+					cardsToDiscard.push(card);
+				} else {
+					cardsToKeep.push(card);
+				}
+			}
+			deck = cardsToKeep;
+			discardPile.push(...cardsToDiscard);
+		}
+
+		// Cleanup UI and state for the next round
+		revealedCards = [];
+		pendingSelection = false;
+		document.getElementById("revealed-container").style.display = 'none';
+		document.getElementById("card-comment").style.display = "none";
+		updateDeckDisplay('grid');
+		updateDiscardDisplay();
+		shuffleDeck();
+	}
+
+	function finalizeSelection(selectedWrapper) {
+	  selectedWrapper.classList.add("highlight");
+	  
+	  const selectedId = Number(selectedWrapper.querySelector(".card").dataset.id);
+	  const selectedCard = revealedCards.find(c => c.id === selectedId);
+
+	  const commentDiv = document.getElementById("card-comment");
+	  if (selectedCard.comment) {
+		commentDiv.textContent = `“${selectedCard.comment}”`;
+		commentDiv.style.display = "block";
+	  } else {
+		commentDiv.style.display = "none";
+	  }
+
+	  // Confetti
+	  import('https://cdn.skypack.dev/canvas-confetti').then(confetti => {
+		const rect = selectedWrapper.getBoundingClientRect();
+		confetti.default({
+		  origin: { x: rect.left / window.innerWidth, y: rect.top / window.innerHeight },
+		  particleCount: 100,
+		  spread: 70
+		});
+	  });
+    	  pendingSelection = true; // Mark that a selection is awaiting finalization
+
+	  // Listen for outside click to finalize card
+	  handleClickOutside = function(e) {
+		if (!selectedWrapper.contains(e.target)) {
+			handleFinalize(selectedCard);
+		}
+	  };
+
+	  document.addEventListener("click", handleClickOutside);
+	}
+
+    function shuffleDeck() {
+      for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+    }
+
+    document.getElementById('shuffle-button').addEventListener('click', revealFiveCardsWithArrow);
+	
+	document.getElementById('toggle-theme-button').addEventListener('click', () => {
+	  document.body.classList.toggle('dark-mode');
+	});
+
+	document.getElementById('toggle-inputs-button').addEventListener('click', () => {
+	  const section = document.getElementById('input-section');
+	  const toggleBtn = document.getElementById('toggle-inputs-button');
+	  const isHidden = section.style.display === 'none';
+
+	  section.style.display = isHidden ? 'block' : 'none';
+	  toggleBtn.textContent = isHidden ? '🙈 Hide Input Section' : '👀 Show Input Section';
+	});
+
+    // Initial load/display of card count
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('card-count-display').textContent = `Cards Loaded: ${deck.length}`;
+        document.getElementById('discard-count-display').textContent = `(${discardPile.length})`;
+    });
+</script>
+
+
+
+
+</html>
