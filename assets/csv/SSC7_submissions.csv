@@ -1,0 +1,36 @@
+id,submitterName,submitterEmail,sunoUsername,songTitle,songUrl,notes
+S1,Submitter One,one@example.com,user_one,Song One,https://suno.com/song/S1,Submitted via web form
+S2,Submitter Two,two@example.com,user_two,Song Two,https://suno.com/song/S2,Submitted via web form
+S3,Submitter Three,three@example.com,user_three,Song Three,https://suno.com/song/S3,Submitted via web form
+S4,Submitter Four,four@example.com,user_four,Song Four,https://suno.com/song/S4,Submitted via web form
+S5,Submitter Five,five@example.com,user_five,Song Five,https://suno.com/song/S5,Submitted via web form
+S6,Submitter Six,six@example.com,user_six,Song Six,https://suno.com/song/S6,Submitted via web form
+S7,Submitter Seven,seven@example.com,user_seven,Song Seven,https://suno.com/song/S7,Submitted via web form
+S8,Submitter Eight,eight@example.com,user_eight,Song Eight,https://suno.com/song/S8,Submitted via web form
+S9,Submitter Nine,nine@example.com,user_nine,Song Nine,https://suno.com/song/S9,Submitted via web form
+S10,Submitter Ten,ten@example.com,user_ten,Song Ten,https://suno.com/song/S10,Submitted via web form
+S11,Submitter Eleven,eleven@example.com,user_eleven,Song Eleven,https://suno.com/song/S11,Submitted via web form
+S12,Submitter Twelve,twelve@example.com,user_twelve,Song Twelve,https://suno.com/song/S12,Submitted via web form
+S13,Submitter Thirteen,thirteen@example.com,user_thirteen,Song Thirteen,https://suno.com/song/S13,Submitted via web form
+S14,Submitter Fourteen,fourteen@example.com,user_fourteen,Song Fourteen,https://suno.com/song/S14,Submitted via web form
+S15,Submitter Fifteen,fifteen@example.com,user_fifteen,Song Fifteen,https://suno.com/song/S15,Submitted via web form
+S16,Submitter Sixteen,sixteen@example.com,user_sixteen,Song Sixteen,https://suno.com/song/S16,Submitted via web form
+S17,Submitter Seventeen,seventeen@example.com,user_seventeen,Song Seventeen,https://suno.com/song/S17,Submitted via web form
+S18,Submitter Eighteen,eighteen@example.com,user_eighteen,Song Eighteen,https://suno.com/song/S18,Submitted via web form
+S19,Submitter Nineteen,nineteen@example.com,user_nineteen,Song Nineteen,https://suno.com/song/S19,Submitted via web form
+S20,Submitter Twenty,twenty@example.com,user_twenty,Song Twenty,https://suno.com/song/S20,Submitted via web form
+S21,Submitter Twenty-One,t21@example.com,user_twenty_one,Song Twenty-One,https://suno.com/song/S21,Submitted via web form
+S22,Submitter Twenty-Two,t22@example.com,user_twenty_two,Song Twenty-Two,https://suno.com/song/S22,Submitted via web form
+S23,Submitter Twenty-Three,t23@example.com,user_twenty_three,Song Twenty-Three,https://suno.com/song/S23,Submitted via web form
+S24,Submitter Twenty-Four,t24@example.com,user_twenty_four,Song Twenty-Four,https://suno.com/song/S24,Submitted via web form
+S25,Submitter Twenty-Five,t25@example.com,user_twenty_five,Song Twenty-Five,https://suno.com/song/S25,Submitted via web form
+S26,Submitter Twenty-Six,t26@example.com,user_twenty_six,Song Twenty-Six,https://suno.com/song/S26,Submitted via web form
+S27,Submitter Twenty-Seven,t27@example.com,user_twenty_seven,Song Twenty-Seven,https://suno.com/song/S27,Submitted via web form
+S28,Submitter Twenty-Eight,t28@example.com,user_twenty_eight,Song Twenty-Eight,https://suno.com/song/S28,Submitted via web form
+S29,Submitter Twenty-Nine,t29@example.com,user_twenty_nine,Song Twenty-Nine,https://suno.com/song/S29,Submitted via web form
+S30,Submitter Thirty,thirty@example.com,user_thirty,Song Thirty,https://suno.com/song/S30,Submitted via web form
+F1,Submitter One,one@example.com,user_one,Song One,https://suno.com/song/F1,Finals submission row
+F2,Submitter Two,two@example.com,user_two,Song Two,https://suno.com/song/F2,Finals submission row
+F3,Submitter Three,three@example.com,user_three,Song Three,https://suno.com/song/F3,Finals submission row
+F4,Submitter Four,four@example.com,user_four,Song Four,https://suno.com/song/F4,Finals submission row
+F5,Submitter Seven,seven@example.com,user_seven,Song Seven,https://suno.com/song/F5,Finals submission row
