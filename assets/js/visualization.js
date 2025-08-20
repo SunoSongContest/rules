@@ -133,43 +133,52 @@ function createAudioVisualizer(audioElement) {
 async function updateVisualization() {
     const songSelect = document.getElementById('songSelect');
     const weekSelect = document.getElementById('weekSelect');
-    const selectedSong = songSelect.value;
-    const selectedWeek = weekSelect.value;
+    const selectedSong = songSelect?.value;
+    const selectedWeek = weekSelect?.value;
     const statsContainer = document.querySelector('.stats-container');
 
     // Hide stats if no selections
     if (!selectedSong || !selectedWeek) {
-        statsContainer.style.display = 'none';
+        if (statsContainer) statsContainer.style.display = 'none';
         return;
     }
 
     // Show stats container
-    statsContainer.style.display = 'grid';
+    if (statsContainer) statsContainer.style.display = 'grid';
 
     // Clear any existing images
     const existingImg = document.querySelector('.song-group img');
-    if (existingImg) {
-        existingImg.remove();
+    if (existingImg) existingImg.remove();
+
+    // Find song by name and stage/week (support both legacy 'week' and new 'stage' field)
+    const songData = window.votes.find(v =>
+        v.songName === selectedSong &&
+        (String(v.stage) === String(selectedWeek) || String(v.week) === String(selectedWeek))
+    );
+
+    const submissionData = window.submissions.find(s => s.songTitle === (songData && songData.songName));
+
+    if (!songData || !submissionData) {
+        console.warn('Song or submission data not found for selection:', selectedSong, selectedWeek);
+        if (statsContainer) statsContainer.style.display = 'none';
+        return;
     }
 
-    const songData = votes.find(v => v.songName === selectedSong && v.week === selectedWeek);
-    const submissionData = submissions.find(s => s.songTitle === songData.songName);
-    
     // Get song ID from URL
     const songId = getSongIdFromUrl(submissionData.songUrl);
-    
+
     // Fetch additional song info including image
     if (songId) {
         const songInfo = await getSongInfo(songId);
         if (songInfo) {
             const imgElement = document.createElement('img');
             imgElement.src = songInfo.imageUrl;
-            imgElement.style.width = '100%'; // Makes image full width of container
+            imgElement.style.width = '100%';
             imgElement.style.height = 'auto';
             imgElement.style.borderRadius = '8px';
             imgElement.style.marginBottom = '15px';
             imgElement.style.objectFit = 'cover';
-            
+
             document.querySelector('.song-group').insertBefore(imgElement, document.querySelector('.song-card'));
         }
     }
@@ -180,9 +189,9 @@ async function updateVisualization() {
         audioPlayer = createStyledAudioPlayer();
         document.querySelector('.song-group').appendChild(audioPlayer);
     }
-    
+
     // Set audio source
-    audioPlayer.src = `https://cdn1.suno.ai/${songId}.mp3`;
+    if (songId) audioPlayer.src = `https://cdn1.suno.ai/${songId}.mp3`;
 
     // Create audio visualizer if it doesn't exist
     if (!document.querySelector('.visualizer')) {
@@ -191,20 +200,18 @@ async function updateVisualization() {
 
     // Update audio player event listener
     audioPlayer.addEventListener('play', () => {
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
+        if (audioContext && audioContext.state === 'suspended') audioContext.resume();
     });
 
-    // Update all stats
+    // Update all stats (use canonical fields)
     document.getElementById('SongName').innerHTML = `<a href="${submissionData.songUrl}" target="_blank">${songData.songName}</a>`;
-    document.getElementById('sunoArtist').textContent = submissionData.sunoUsername;
-    document.getElementById('averageScore').textContent = songData.avgPoints;
-    document.getElementById('totalVoters').textContent = songData.numVoters;
-    document.getElementById('totalPoints').textContent = songData.points;
-    document.getElementById('weeklyRank').textContent = songData.weeklyRank;
+    document.getElementById('sunoArtist').textContent = submissionData.sunoUsername || '-';
+    document.getElementById('averageScore').textContent = songData.avgPoints ?? songData.avg_points ?? '-';
+    document.getElementById('totalVoters').textContent = songData.numVoters ?? songData.num_voters ?? '-';
+    document.getElementById('totalPoints').textContent = songData.pointsFinal ?? songData.points ?? '-';
+    document.getElementById('weeklyRank').textContent = songData.weeklyRank ?? songData.weekly_rank ?? '-';
 
-    // Update chart with vote distribution
+    // Update chart with vote distribution (chart expects votes12..votes1)
     updateChart(songData);
 }
 function getSongIdFromUrl(url) {

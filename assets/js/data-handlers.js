@@ -61,13 +61,22 @@ function handleEditionChange(event) {
 }
 async function loadEditionData(event) {
     const edition = event.target.value;
-    if(!edition) return;
-    
-    const files = window.CSV_MANIFEST.getEditionFiles(edition);
-    if (!files) return;
-    
+    if (!edition) return;
+
+    const editionConfig = window.CSV_MANIFEST.getEditionConfig(parseInt(edition));
+    if (!editionConfig) {
+        console.error(`No config found for edition: ${edition}`);
+        return;
+    }
+
+    const files = editionConfig.files;
+    if (!files) {
+        console.error('No files configured for edition', edition);
+        return;
+    }
+
     const csvPath = `${window.location.origin}/rules/assets/csv`;
-    
+
     try {
         const [submissionsResponse, votesResponse] = await Promise.all([
             fetch(`${csvPath}/${files.submissions}`),
@@ -76,27 +85,45 @@ async function loadEditionData(event) {
 
         const submissionsText = await submissionsResponse.text();
         const votesText = await votesResponse.text();
-        
-        submissions = parseSubmissionsCSV(submissionsText);
-        votes = parseVotesCSV(votesText);
-        
-        // Get weeks dynamically from votes data
-        const weeks = getWeeksFromVotes(votes);
-        
+
+        // Parse submissions using existing parser
+        window.submissions = parseSubmissionsCSV(submissionsText);
+
+        // Parse and normalize votes according to edition config
+        const rawVotes = parseVotesCSV(votesText, editionConfig);
+        window.rawVotes = rawVotes;
+
+        // Provide normalized canonical votes for the rest of the app while preserving backwards compatibility
+        // canonical fields: id, songName, stage, pointsRaw, bonusPoints, pointsFinal, numVoters, avgPoints, weeklyRank, result, votes12..votes1
+        window.votes = rawVotes; // keep old API; objects are canonical
+
+        // Determine weeks/stages for UI
+        const weeks = getWeeksFromVotes(window.votes, editionConfig);
+
         initializeSelects(weeks);
         initializeMenu();
-        
-        // Reset views
-        document.getElementById('songSelect').value = '';
-        document.getElementById('weekSelect').value = '';
-        document.getElementById('summaryWeekSelect').value = '';
-        
+
+        // Reset views and selectors
+        const songSelectEl = document.getElementById('songSelect');
+        const weekSelectEl = document.getElementById('weekSelect');
+        const summaryWeekSelectEl = document.getElementById('summaryWeekSelect');
+
+        if (songSelectEl) songSelectEl.value = '';
+        if (weekSelectEl) weekSelectEl.value = '';
+        if (summaryWeekSelectEl) summaryWeekSelectEl.value = '';
+
         const statsContainer = document.querySelector('.stats-container');
-        statsContainer.style.display = 'none';
-        
-        if(chart) {
-            chart.destroy();
+        if (statsContainer) statsContainer.style.display = 'none';
+
+        if (window.chart) {
+            window.chart.destroy();
+            window.chart = null;
         }
+
+        console.log(`Loaded and normalized edition SSC${edition}`, {
+            totalSongs: window.votes.length,
+            weeks
+        });
     } catch (error) {
         console.error('Error loading edition data:', error);
     }
@@ -190,66 +217,8 @@ function parseVotesCSV(csv) {
     return result;
 }
 
-async function loadEditionData(event) {
-    const edition = event.target.value;
-    if(!edition) return;
-    
-    const files = window.CSV_MANIFEST.getEditionFiles(edition);
-    if (!files) return;
-    
-    const csvPath = `${window.location.origin}/rules/assets/csv`;
-    
-    try {
-        console.log('Loading files:', files);
-        const [submissionsResponse, votesResponse] = await Promise.all([
-            fetch(`${csvPath}/${files.submissions}`),
-            fetch(`${csvPath}/${files.votes}`)
-        ]);
-
-        const submissionsText = await submissionsResponse.text();
-        const votesText = await votesResponse.text();
-        
-        // Parse data and store globally
-        window.submissions = parseSubmissionsCSV(submissionsText);
-        window.votes = parseVotesCSV(votesText);
-        
-        console.log('Loaded votes:', window.votes);
-        
-        // Get unique weeks
-        const uniqueWeeks = [...new Set(window.votes.map(v => v.week))].sort((a, b) => {
-            if (!isNaN(a) && !isNaN(b)) return parseInt(a) - parseInt(b);
-            if (!isNaN(a)) return -1;
-            if (!isNaN(b)) return 1;
-            if (a === '2nd-chance') return -1;
-            if (b === '2nd-chance') return 1;
-            return 0;
-        });
-        
-        console.log('Unique weeks found:', uniqueWeeks);
-        
-        // Populate week selectors
-        const weekSelect = document.getElementById('weekSelect');
-        const summaryWeekSelect = document.getElementById('summaryWeekSelect');
-        
-        [weekSelect, summaryWeekSelect].forEach(select => {
-            select.innerHTML = '<option value="">Select Week</option>';
-            uniqueWeeks.forEach(week => {
-                const option = document.createElement('option');
-                option.value = week;
-                option.textContent = isNaN(week) ? week : `Week ${week}`;
-                select.appendChild(option);
-            });
-        });
-        
-        // Initialize week listeners
-        initializeWeekListeners();
-        
-        console.log('Week selectors populated and listeners attached');
-        
-    } catch (error) {
-        console.error('Error loading edition data:', error);
-    }
-}
+/* NOTE: This function was duplicated earlier in the file. The active loadEditionData
+   implementation is defined above. This duplicate has been removed to avoid conflicts. */
 
 function updateSongSelect() {
     const weekSelect = document.getElementById('weekSelect');

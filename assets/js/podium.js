@@ -1,186 +1,267 @@
-// Podium display logic
+/*
+ Podium display logic (normalized)
+
+ This module expects vote objects to be in the canonical form produced by the
+ normalization adapter in data-handlers.js. Canonical fields used here:
+   - id
+   - songName
+   - stage            // e.g. '1', 'Bunk A', 'Track Save', '2nd-chance', 'Finals'
+   - pointsRaw
+   - bonusPoints
+   - pointsFinal
+   - votes12 .. votes1
+   - numVoters
+   - avgPoints
+   - weeklyRank
+   - result
+   - _rawRow           // original CSV row (optional)
+
+ Backwards compatibility:
+   - If canonical fields are absent this code falls back to legacy fields:
+     points, week, etc.
+*/
+
 async function updatePodium(weekVotes) {
     if (!weekVotes || weekVotes.length === 0) return;
-    
+
     console.log('Updating podium with votes:', weekVotes);
+
     const podiumSection = document.querySelector('.top-songs-podium');
     const finalistsPodium = document.querySelector('.finalists-podium');
     const secondChancePodium = document.querySelector('.second-chance-podium');
     const secondChanceSection = document.querySelector('.second-chance-section');
 
+    if (!podiumSection || !finalistsPodium || !secondChancePodium) {
+        console.warn('Podium DOM elements missing');
+        return;
+    }
+
     // Clear existing content
     finalistsPodium.innerHTML = '';
     secondChancePodium.innerHTML = '';
 
-    // Sort and filter songs
-    const sortedSongs = [...weekVotes].sort((a, b) => parseInt(b.points) - parseInt(a.points));
-    console.log('Sorted songs:', sortedSongs);
-    console.log('Sample song data:', sortedSongs[0]);
+    // Normalized accessor helpers
+    const getPointsFinal = (v) => {
+        if (v.pointsFinal !== undefined && v.pointsFinal !== null) return Number(v.pointsFinal);
+        if (v.points !== undefined) return Number(v.points);
+        // try legacy numeric parsing from _rawRow if present
+        return 0;
+    };
 
-    // Check if this is Finals week
-    if (sortedSongs[0]?.week === 'Finals') {
+    const getStage = (v) => v.stage ?? v.week ?? v.stageLabel ?? '';
+    const normalizeResult = (s) => String(s || '').toLowerCase().replace(/[\s_-]+/g, '');
+
+    // Sort by final points descending
+    const sortedSongs = [...weekVotes].sort((a, b) => getPointsFinal(b) - getPointsFinal(a));
+    console.log('Sorted songs:', sortedSongs.slice(0, 5));
+
+    // Detect if this is a finals stage by inspecting stage labels or by detecting "final" results
+    const stageSamples = sortedSongs.map(s => String(getStage(s)).toLowerCase());
+    const isFinalsStage = stageSamples.some(s => s.includes('final'));
+    const isBunkStage = stageSamples.some(s => s.toLowerCase().includes('bunk'));
+    const isTrackSave = stageSamples.some(s => s.toLowerCase().includes('track'));
+    const isSecondChance = stageSamples.some(s => s.includes('2nd') || s.includes('second'));
+
+    // Helper: find by normalized result label (e.g., 'winner', '2ndplace', 'bbn')
+    const findByResult = (label) => sortedSongs.find(s => normalizeResult(s.result) === normalizeResult(label));
+
+    // Helper to create a block of finals (Winner/2nd/3rd/BBN) when in Finals stage
+    if (isFinalsStage) {
         console.log('Processing Finals week');
         podiumSection.style.display = 'block';
         secondChanceSection.style.display = 'none';
 
-        const winner = sortedSongs.find(s => s.result?.trim() === 'Winner');
-        const secondPlace = sortedSongs.find(s => s.result?.trim() === '2nd-place');
-        const thirdPlace = sortedSongs.find(s => s.result?.trim() === '3rd-place');
-        const bbn = sortedSongs.find(s => s.result?.trim() === 'BBN');
-
-        console.log('Finals positions:', { winner, secondPlace, thirdPlace, bbn });
+        const winner = findByResult('Winner') || sortedSongs[0];
+        const secondPlace = findByResult('2nd-place') || sortedSongs[1];
+        const thirdPlace = findByResult('3rd-place') || sortedSongs[2];
+        const bbn = findByResult('BBN');
 
         let finalsHTML = '<div class="finals-podium"><div class="winners-row">';
-        
+
         if (secondPlace) {
-            const submission = window.submissions.find(s => s.songTitle === secondPlace.songName);
-            if (submission) {
-                const songId = getSongIdFromUrl(submission.songUrl);
-                const songInfo = await getSongInfo(songId);
-                finalsHTML += createPodiumHTML(secondPlace, submission, songInfo, 'medium');
-            }
+            const submission = window.submissions?.find(s => s.songTitle === secondPlace.songName) || {};
+            const songInfo = await safeGetSongInfo(submission);
+            finalsHTML += createPodiumHTML(secondPlace, submission, songInfo, 'medium');
         }
-        
+
         if (winner) {
-            const submission = window.submissions.find(s => s.songTitle === winner.songName);
-            if (submission) {
-                const songId = getSongIdFromUrl(submission.songUrl);
-                const songInfo = await getSongInfo(songId);
-                finalsHTML += createPodiumHTML(winner, submission, songInfo, 'large');
-            }
+            const submission = window.submissions?.find(s => s.songTitle === winner.songName) || {};
+            const songInfo = await safeGetSongInfo(submission);
+            finalsHTML += createPodiumHTML(winner, submission, songInfo, 'large');
         }
-        
+
         if (thirdPlace) {
-            const submission = window.submissions.find(s => s.songTitle === thirdPlace.songName);
-            if (submission) {
-                const songId = getSongIdFromUrl(submission.songUrl);
-                const songInfo = await getSongInfo(songId);
-                finalsHTML += createPodiumHTML(thirdPlace, submission, songInfo, 'medium');
-            }
+            const submission = window.submissions?.find(s => s.songTitle === thirdPlace.songName) || {};
+            const songInfo = await safeGetSongInfo(submission);
+            finalsHTML += createPodiumHTML(thirdPlace, submission, songInfo, 'medium');
         }
-        
+
         finalsHTML += '</div>';
-        
+
         if (bbn) {
-            const submission = window.submissions.find(s => s.songTitle === bbn.songName);
-            if (submission) {
-                const songId = getSongIdFromUrl(submission.songUrl);
-                const songInfo = await getSongInfo(songId);
-                finalsHTML += `
-                    <div class="bbn-row">
-                        <h3>Best Brand New</h3>
-                        ${createPodiumHTML(bbn, submission, songInfo, 'medium')}
-                    </div>`;
-            }
+            const submission = window.submissions?.find(s => s.songTitle === bbn.songName) || {};
+            const songInfo = await safeGetSongInfo(submission);
+            finalsHTML += `
+                <div class="bbn-row">
+                    <h3>Best Brand New</h3>
+                    ${createPodiumHTML(bbn, submission, songInfo, 'medium')}
+                </div>`;
         }
-        
+
         finalsHTML += '</div>';
         finalistsPodium.innerHTML = finalsHTML;
         return;
     }
-    // Regular week handling
-    const finalists = sortedSongs.filter(song => song.result?.trim() === 'Finalist');
-    const secondChance = sortedSongs.filter(song => song.result?.trim() === '2nd Chance');
-    
-    console.log('Regular week songs:', { finalists, secondChance });
-    if (finalists.length > 0) {
+
+    // Regular week handling (Finalists / Second Chance / Bunk summaries)
+    // We expect CSV 'result' flags to mark 'Finalist' and '2nd Chance' (or variants).
+    const finalists = sortedSongs.filter(song => normalizeResult(song.result) === 'finalist' || normalizeResult(song.result) === 'finalists');
+    const secondChance = sortedSongs.filter(song => normalizeResult(song.result).includes('2nd') || normalizeResult(song.result).includes('secondchance') || normalizeResult(song.result).includes('2ndchance') || normalizeResult(song.result).includes('2ndchance'));
+
+    // If the CSV doesn't include explicit result flags, gracefully derive finalists from top N
+    // (This keeps compatibility when raw CSVs just list top songs)
+    const maybeDeriveFinalists = () => {
+        if (finalists.length > 0) return finalists;
+        // Heuristic: top 5 are finalists and 6-10 are second chance for legacy numeric weekly shows
+        const legacyFinals = sortedSongs.slice(0, 5);
+        const legacySecond = sortedSongs.slice(5, 10);
+        return legacyFinals;
+    };
+
+    const usedFinalists = finalists.length > 0 ? finalists : maybeDeriveFinalists();
+    const usedSecondChance = secondChance.length > 0 ? secondChance : sortedSongs.slice(5, 10);
+
+    console.log('Regular week songs:', { usedFinalistsCount: usedFinalists.length, usedSecondChanceCount: usedSecondChance.length });
+
+    if (usedFinalists.length > 0) {
         podiumSection.style.display = 'block';
         let finalistsHTML = '<div class="podium-section"><h2>Finalists</h2><div class="podium-container">';
-        
-        for (const song of finalists) {
-            const submission = window.submissions.find(s => s.songTitle === song.songName);
-            if (!submission) continue;
-            
-            const songId = getSongIdFromUrl(submission.songUrl);
-            const songInfo = await getSongInfo(songId);
-            finalistsHTML += createPodiumHTML(song, submission, songInfo);
+
+        for (const song of usedFinalists) {
+            const submission = window.submissions?.find(s => s.songTitle === song.songName);
+            const safeSubmission = submission || {};
+            const songInfo = await safeGetSongInfo(safeSubmission);
+            finalistsHTML += createPodiumHTML(song, safeSubmission, songInfo);
         }
-        
+
         finalistsHTML += '</div></div>';
         finalistsPodium.innerHTML = finalistsHTML;
 
-        if (secondChance.length > 0) {
+        if (usedSecondChance.length > 0) {
             secondChanceSection.style.display = 'block';
             let secondChanceHTML = '<div class="podium-section"><h2>Second Chance</h2><div class="podium-container">';
-            
-            for (const song of secondChance) {
-                const submission = window.submissions.find(s => s.songTitle === song.songName);
-                if (!submission) continue;
-                
-                const songId = getSongIdFromUrl(submission.songUrl);
-                const songInfo = await getSongInfo(songId);
-                secondChanceHTML += createPodiumHTML(song, submission, songInfo);
+
+            for (const song of usedSecondChance) {
+                const submission = window.submissions?.find(s => s.songTitle === song.songName);
+                const safeSubmission = submission || {};
+                const songInfo = await safeGetSongInfo(safeSubmission);
+                secondChanceHTML += createPodiumHTML(song, safeSubmission, songInfo);
             }
-            
+
             secondChanceHTML += '</div></div>';
             secondChancePodium.innerHTML = secondChanceHTML;
         }
     } else {
         podiumSection.style.display = 'none';
     }
-}function createPodiumHTML(song, submission, songInfo, size = '') {
+}
+
+/**
+ * Create HTML for a podium item. Uses canonical fields if present and falls back to legacy ones.
+ */
+function createPodiumHTML(song, submission = {}, songInfo = { imageUrl: '' }, size = '') {
     const sizeClass = size ? ` podium-item-${size}` : '';
+
+    const displayRank = song.weeklyRank ?? song.weekly_rank ?? (song._rawRow && song._rawRow[16]) ?? '';
+    const displayPoints = (song.pointsFinal !== undefined) ? song.pointsFinal : (song.points ?? 0);
+    const artist = submission.sunoUsername || submission.suno_username || submission.artist || '-';
+    const imageUrl = songInfo?.imageUrl || 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365';
+
     return `
         <div class="podium-item${sizeClass}">
-            <a href="${submission.songUrl}" target="_blank">
-                <img src="${songInfo.imageUrl}" alt="${song.songName}" onerror="this.src='https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365'">
+            <a href="${submission.songUrl || '#'}" target="_blank">
+                <img src="${imageUrl}" alt="${escapeHtml(song.songName)}" onerror="this.src='https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365'">
             </a>
-            <div class="podium-rank"># ${song.weeklyRank}</div>
+            <div class="podium-rank">${displayRank ? `# ${displayRank}` : ''}</div>
             <div class="podium-title">
-                <a href="${submission.songUrl}" target="_blank">${song.songName}</a>
+                <a href="${submission.songUrl || '#'}" target="_blank">${escapeHtml(song.songName)}</a>
             </div>
-            <div class="podium-artist">by ${submission.sunoUsername}</div>
-            <div class="podium-points">${song.points} points</div>
+            <div class="podium-artist">by ${escapeHtml(artist)}</div>
+            <div class="podium-points">${displayPoints} points</div>
         </div>
     `;
 }
 
+/**
+ * Helper to safely fetch songInfo (wrap getSongInfo call and handle missing submission URLs)
+ */
+async function safeGetSongInfo(submission) {
+    try {
+        if (!submission || !submission.songUrl) {
+            return { imageUrl: 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365' };
+        }
+        const songId = getSongIdFromUrl(submission.songUrl);
+        if (!songId) return { imageUrl: 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365' };
+        const info = await getSongInfo(songId);
+        return info || { imageUrl: 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365' };
+    } catch (e) {
+        console.warn('safeGetSongInfo failed', e);
+        return { imageUrl: 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365' };
+    }
+}
+
+/**
+ * Lightweight HTML escape for titles/usernames
+ */
+function escapeHtml(text) {
+    if (!text && text !== 0) return '';
+    return String(text)
+        .replace(/&/g, '&')
+        .replace(/</g, '<')
+        .replace(/>/g, '>')
+        .replace(/"/g, '"')
+        .replace(/'/g, '&#039;');
+}
+
+/**
+ * Backwards-compatible async helper: createPodiumItem kept for any callers that want an item string
+ */
 async function createPodiumItem(song, size = 'medium') {
     if (!song) return '';
-    
-    const submission = submissions.find(s => s.songTitle === song.songName);
-    if (!submission) return '';
-    
-    const songId = getSongIdFromUrl(submission.songUrl);
-    console.log('Creating podium item for song:', songId);
-
-    // Get song info before creating HTML
-    const songInfo = await getSongInfo(songId).catch(err => {
-        console.warn(`Failed to fetch info for song ${songId}:`, err);
-        return {
-            id: songId,
-            imageUrl: 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365'
-        };
-    });
-
+    const submission = (window.submissions || []).find(s => s.songTitle === song.songName) || {};
+    const songInfo = await safeGetSongInfo(submission);
     const sizeClasses = {
         large: 'podium-item-large',
         medium: 'podium-item-medium',
         small: 'podium-item-small'
     };
 
-    const rankLabels = {
-        'Winner': '🏆 Winner',
-        '2nd-place': '🥈 2nd Place',
-        '3rd-place': '🥉 3rd Place',
-        'BBN': '✨ Best Brand New',
-        'Finalist': `#${song.weeklyRank}`,
-        '2nd Chance': `#${song.weeklyRank}`
-    };
-    
+    const rankLabel = (() => {
+        const r = (song.result || '').toString();
+        const normalized = r.toLowerCase().replace(/[\s_-]+/g, '');
+        if (normalized === 'winner') return '🏆 Winner';
+        if (normalized === '2ndplace' || normalized === '2nd-place' || normalized === '2ndplace') return '🥈 2nd Place';
+        if (normalized === '3rdplace') return '🥉 3rd Place';
+        if (normalized === 'bbn') return '✨ Best Brand New';
+        return `#${song.weeklyRank || song.weekly_rank || ''}`;
+    })();
+
+    const points = (song.pointsFinal !== undefined) ? song.pointsFinal : (song.points ?? 0);
+    const artist = submission.sunoUsername || submission.suno_username || submission.artist || '-';
+
     return `
         <div class="podium-item ${sizeClasses[size]}">
-            <a href="${submission.songUrl}" target="_blank">
+            <a href="${submission.songUrl || '#'}" target="_blank">
                 <img src="${songInfo.imageUrl}" 
-                     alt="${song.songName}" 
+                     alt="${escapeHtml(song.songName)}" 
                      onerror="this.src='https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365'">
             </a>
-            <div class="podium-rank">${rankLabels[song.result] || `#${song.weeklyRank}`}</div>
+            <div class="podium-rank">${rankLabel}</div>
             <div class="podium-title">
-                <a href="${submission.songUrl}" target="_blank">${song.songName}</a>
+                <a href="${submission.songUrl || '#'}" target="_blank">${escapeHtml(song.songName)}</a>
             </div>
-            <div class="podium-artist">by ${submission.sunoUsername}</div>
-            <div class="podium-points">${song.points} points</div>
+            <div class="podium-artist">by ${escapeHtml(artist)}</div>
+            <div class="podium-points">${points} points</div>
         </div>
     `;
 }
