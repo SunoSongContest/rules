@@ -231,15 +231,15 @@ function updateSongSelect() {
     songSelect.innerHTML = '<option value="">Select Song</option>';
 
     if (selectedWeek && window.votes) {
-        const weekSongs = window.votes.filter(s => String(s.week) === String(selectedWeek));
+        const weekSongs = window.votes.filter(s => String(s.stage) === String(selectedWeek));
         console.log('Filtered songs for week:', weekSongs);
         
-        weekSongs.sort((a, b) => parseInt(b.points) - parseInt(a.points));
+        weekSongs.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
         
         weekSongs.forEach(song => {
             const option = document.createElement('option');
             option.value = song.songName;
-            option.textContent = `${song.songName} (${song.points} points)`;
+            option.textContent = `${song.songName} (${song.pointsFinal} points)`;
             songSelect.appendChild(option);
             console.log('Added song:', song.songName);
         });
@@ -256,18 +256,18 @@ function initializeWeekListeners() {
     // Song votes view listener
     weekSelect.addEventListener('change', (e) => {
         console.log('Week selection changed:', e.target.value);
-        const weekSongs = window.votes.filter(v => v.week === e.target.value);
+        const weekSongs = window.votes.filter(v => v.stage === e.target.value);
         console.log('Found songs:', weekSongs.length, weekSongs);
         
         const songSelect = document.getElementById('songSelect');
         songSelect.innerHTML = '<option value="">Select Song</option>';
         
         weekSongs
-            .sort((a, b) => parseInt(b.points) - parseInt(a.points))
+            .sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal))
             .forEach(song => {
                 const option = document.createElement('option');
                 option.value = song.songName;
-                option.textContent = `${song.songName} (${song.points} pts)`;
+                option.textContent = `${song.songName} (${song.pointsFinal} pts)`;
                 songSelect.appendChild(option);
             });
     });
@@ -278,7 +278,7 @@ function initializeWeekListeners() {
         console.log('Summary week changed:', selectedWeek);
         
         if (selectedWeek && window.votes) {
-            const weekVotes = window.votes.filter(v => String(v.week) === String(selectedWeek));
+            const weekVotes = window.votes.filter(v => String(v.stage) === String(selectedWeek));
             console.log('Found votes for summary:', weekVotes.length, weekVotes);
             
             // Update podium and chart in a single call
@@ -293,11 +293,11 @@ function initializeWeekListeners() {
         const selectedWeek = weekSelect.value;
         
         if (selectedSong && selectedWeek) {
-            const songData = window.votes.find(v => 
-                v.songName === selectedSong && 
-                v.week === selectedWeek
+            const songData = window.votes.find(v =>
+                v.songName === selectedSong &&
+                v.stage === selectedWeek
             );
-            const submissionData = window.submissions.find(s => 
+            const submissionData = window.submissions.find(s =>
                 s.songTitle === selectedSong
             );
             
@@ -306,12 +306,12 @@ function initializeWeekListeners() {
                 document.querySelector('.stats-container').style.display = 'grid';
                 
                 // Update song info
-                document.getElementById('SongName').innerHTML = 
+                document.getElementById('SongName').innerHTML =
                     `<a href="${submissionData.songUrl}" target="_blank">${songData.songName}</a>`;
                 document.getElementById('sunoArtist').textContent = submissionData.sunoUsername;
                 document.getElementById('averageScore').textContent = songData.avgPoints;
                 document.getElementById('totalVoters').textContent = songData.numVoters;
-                document.getElementById('totalPoints').textContent = songData.points;
+                document.getElementById('totalPoints').textContent = songData.pointsFinal;
                 document.getElementById('weeklyRank').textContent = songData.weeklyRank;
                 
                 // Create/update audio player and visualizer
@@ -449,7 +449,7 @@ function updateWeeklySummary(selectedWeek) {
     podiumSection.style.display = selectedWeek ? 'block' : 'none';
     
     if (selectedWeek && window.votes) {
-        const weekVotes = window.votes.filter(v => String(v.week) === String(selectedWeek));
+        const weekVotes = window.votes.filter(v => String(v.stage) === String(selectedWeek));
         console.log('Processing votes for weekly summary:', weekVotes.length);
         
         handleWeeklySummaryUpdate(weekVotes, selectedWeek);
@@ -464,7 +464,7 @@ function handleWeeklySummaryUpdate(weekVotes, selectedWeek) {
     }
     
     // Sort votes once
-    const sortedVotes = weekVotes.sort((a, b) => parseInt(b.points) - parseInt(a.points));
+    const sortedVotes = weekVotes.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
     console.log('Sorted votes for display:', sortedVotes);
     
     // Single call to update podium
@@ -494,7 +494,7 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek) {
             labels: sortedVotes.map(v => v.songName),
             datasets: [{
                 label: 'Total Points',
-                data: sortedVotes.map(v => parseInt(v.points)),
+                data: sortedVotes.map(v => parseInt(v.pointsFinal)),
                 backgroundColor: 'rgba(90, 30, 90, 0.6)',
                 borderColor: 'rgba(90, 30, 90, 1)',
                 borderWidth: 1

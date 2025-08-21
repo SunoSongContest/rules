@@ -33,6 +33,7 @@ function toggleViews(selectedView) {
     
     if (viewToShow) viewToShow.style.display = 'block';
 }
+
 function initializeMenu() {
     console.log('Initializing menu...');
     const songVotesView = document.getElementById('song-votes-view');
@@ -71,30 +72,10 @@ function initializeMenu() {
         });
     });
 }
+
 // Export for use in visualization.js
 window.setupMenuHandlers = setupMenuHandlers;
-    const summaryWeekSelect = document.getElementById('summaryWeekSelect');
-    summaryWeekSelect.innerHTML = '<option value="">Select Week</option>';
-    
-    // Get unique weeks from votes data
-    const uniqueWeeks = [...new Set(votes.map(v => v.week))].sort((a, b) => {
-        // Custom sort: numeric weeks first, then '2nd-chance', then 'Finals'
-        if (!isNaN(a) && !isNaN(b)) return parseInt(a) - parseInt(b);
-        if (!isNaN(a)) return -1;
-        if (!isNaN(b)) return 1;
-        if (a === '2nd-chance') return -1;
-        if (b === '2nd-chance') return 1;
-        return 0;
-    });
 
-    // Populate select with all available weeks
-    uniqueWeeks.forEach(week => {
-        const option = document.createElement('option');
-        option.value = week;
-        option.textContent = isNaN(week) ? week : `Week ${week}`;
-        summaryWeekSelect.appendChild(option);
-    });
-    
 function initializeMobileMenu() {
     const menuToggle = document.querySelector('.menu-toggle');
     const sideMenu = document.querySelector('.side-menu');
@@ -125,46 +106,48 @@ function initializeMobileMenu() {
         });
     });
 }
-function initializeSelects() {
+
+function initializeSelects(weeks) {
     const weekSelect = document.getElementById('weekSelect');
     const summaryWeekSelect = document.getElementById('summaryWeekSelect');
     
     weekSelect.innerHTML = '<option value="">Select Week</option>';
     summaryWeekSelect.innerHTML = '<option value="">Select Week</option>';
     
-    const edition = document.getElementById('sscEditionSelect').value;
-    const editionData = window.CSV_MANIFEST.getEditionFiles(parseInt(edition));
-    
-    if (editionData) {
-        for (let week = 1; week <= editionData.weeks; week++) {
-            const option1 = document.createElement('option');
-            option1.value = week.toString();
-            option1.textContent = `Week ${week}`;
-            weekSelect.appendChild(option1.cloneNode(true));
-            summaryWeekSelect.appendChild(option1);
-        }
+    // Use the weeks array passed from data-handlers.js (derived from edition-config or data)
+    if (weeks && Array.isArray(weeks)) {
+        weeks.forEach(week => {
+            const option = document.createElement('option');
+            option.value = week;
+            option.textContent = isNaN(week) ? week : `Week ${week}`;
+            
+            weekSelect.appendChild(option.cloneNode(true));
+            summaryWeekSelect.appendChild(option.cloneNode(true));
+        });
     }
 
     // Add all event listeners in one place
     weekSelect.addEventListener('change', updateSongSelect);
     document.getElementById('songSelect').addEventListener('change', updateVisualization);
     document.getElementById('summaryWeekSelect').addEventListener('change', updateWeeklySummary);
-}function updateSongSelect() {
+}
+
+function updateSongSelect() {
     const weekSelect = document.getElementById('weekSelect');
     const songSelect = document.getElementById('songSelect');
     const selectedWeek = weekSelect.value;
 
     songSelect.innerHTML = '<option value="">Select Song</option>';
 
-    if (selectedWeek) {
-        const weekSongs = votes.filter(s => s.week === selectedWeek && parseInt(s.points) > 0);
+    if (selectedWeek && window.votes) {
+        const weekSongs = window.votes.filter(s => s.stage === selectedWeek && parseInt(s.pointsFinal) > 0);
         
-        weekSongs.sort((a, b) => parseInt(b.points) - parseInt(a.points));
+        weekSongs.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
         
         weekSongs.forEach(song => {
             const option = document.createElement('option');
             option.value = song.songName;
-            option.textContent = song.songName;
+            option.textContent = `${song.songName} (${song.pointsFinal} points)`;
             songSelect.appendChild(option);
         });
     }
