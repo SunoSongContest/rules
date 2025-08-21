@@ -640,15 +640,19 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         return;
     }
 
-    // Create Chart.js instance with initial data (may be empty)
-    window.chart = new Chart(context, {
+    // Create Chart.js instance with initial data (may be empty).
+    // Use the canvas element itself as the first argument (some Chart.js builds
+    // perform better when given the element instead of a 2D context).
+    window.chart = new Chart(chartCanvas, {
         type: 'bar',
         data: {
+            // Start with the labels/data we computed. We'll re-assign explicitly
+            // after creation to guard against Chart.js clearing behaviour.
             labels: labels,
             datasets: [{
                 label: 'Total Points',
                 data: dataPoints,
-                backgroundColor: 'rgba(90, 30, 90, 0.85)',
+                backgroundColor: 'rgba(90, 30, 90, 0.95)',
                 borderColor: 'rgba(90, 30, 90, 1)',
                 borderWidth: 1
             }]
@@ -682,6 +686,25 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
             }
         }
     });
+
+    // Immediately (synchronously) re-assign the chart data to ensure nothing in Chart.js
+    // runtime overwrites/clears it. Then force an update.
+    try {
+        if (window.chart) {
+            window.chart.data.labels = labels;
+            window.chart.data.datasets = [{
+                label: 'Total Points',
+                data: dataPoints,
+                backgroundColor: 'rgba(90, 30, 90, 0.95)',
+                borderColor: 'rgba(90, 30, 90, 1)',
+                borderWidth: 1
+            }];
+            window.chart.update();
+            console.log('Assigned chart.labels/data synchronously; lengths:', window.chart.data.labels.length, window.chart.data.datasets[0].data.length);
+        }
+    } catch (e) {
+        console.warn('Synchronous chart assignment failed:', e);
+    }
 
     // Defensive fallback: if Chart.js ended up with empty labels/data, set them explicitly and force an update.
     try {
