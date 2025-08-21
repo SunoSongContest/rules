@@ -96,6 +96,32 @@ async function loadEditionData(event) {
         // Provide normalized canonical votes for the rest of the app while preserving backwards compatibility
         // canonical fields: id, songName, stage, pointsRaw, bonusPoints, pointsFinal, numVoters, avgPoints, weeklyRank, result, votes12..votes1
         window.votes = rawVotes; // keep old API; objects are canonical
+// Normalize legacy/compat fields so UI filters work reliably.
+// Ensure every vote has both `stage` and `pointsFinal` populated.
+if (window.votes && Array.isArray(window.votes)) {
+    window.votes.forEach(v => {
+        // stage fallback: stage <- week <- stageLabel
+        v.stage = (v.stage || v.week || v.stageLabel || '').toString();
+
+        // pointsFinal fallback: prefer existing pointsFinal, otherwise use points + bonusPoints (or numeric points)
+        const parseNum = x => {
+            if (x === undefined || x === null || x === '') return 0;
+            const n = parseInt(String(x).replace(/[^0-9-]/g, ''), 10);
+            return isNaN(n) ? 0 : n;
+        };
+
+        if (v.pointsFinal === undefined || v.pointsFinal === null || v.pointsFinal === '') {
+            const rawPoints = parseNum(v.points);
+            const bonus = parseNum(v.bonusPoints);
+            v.pointsFinal = rawPoints + bonus;
+        }
+
+        // ensure points also exists as numeric string for legacy code paths
+        if (v.points === undefined || v.points === null) {
+            v.points = String(v.pointsFinal || 0);
+        }
+    });
+}
 
         // Determine weeks/stages for UI
         const weeks = getWeeksFromVotes(window.votes, editionConfig);
@@ -273,38 +299,12 @@ function parseVotesCSV(csv, editionConfig = {}) {
     return result;
 }
 
-function parseVotesCSV(csv) {
-    const lines = csv.split('\n');
-    const result = [];
-
-    for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        
-        const values = lines[i].split(',');
-        result.push({
-            id: values[0],
-            songName: values[1],
-            week: values[2],         // Week is in the third column
-            points: values[3],
-            votes12: values[4],
-            votes10: values[5],
-            votes8: values[6],
-            votes7: values[7],
-            votes6: values[8],
-            votes5: values[9],
-            votes4: values[10],
-            votes3: values[11],
-            votes2: values[12],
-            votes1: values[13],
-            numVoters: values[14],
-            avgPoints: values[15],
-            weeklyRank: values[16],
-            result: values[17]
-        });
-    }
-    console.log('Parsed votes data:', result);
-    return result;
-}
+/* Legacy parseVotesCSV removed.
+   The canonical, flexible parser defined earlier in this file produces normalized
+   vote objects with `stage` and `pointsFinal` fields. The old, legacy parser
+   would overwrite that function and return objects without the canonical fields,
+   causing filtering by stage/pointsFinal to fail. Keeping a note here for history.
+*/
 
 /* NOTE: This function was duplicated earlier in the file. The active loadEditionData
    implementation is defined above. This duplicate has been removed to avoid conflicts. */
