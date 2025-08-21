@@ -600,25 +600,55 @@ function handleWeeklySummaryUpdate(weekVotes, selectedWeek) {
 
 // Make updateWeeklySummary globally availablewindow.updateWeeklySummary = updateWeeklySummary;window.updateWeeklySummary = updateWeeklySummary;
 
-function updateWeeklySummaryChart(sortedVotes, selectedWeek) {
+function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
     const chartCanvas = document.getElementById('weekSummaryChart');
-    chartCanvas.style.height = '1200px';
-    
-    if (window.chart) {
-        window.chart.destroy();
+    if (!chartCanvas) {
+        console.error('updateWeeklySummaryChart: canvas element with id "weekSummaryChart" not found');
+        return;
     }
-    
-    console.log('Creating chart with votes:', sortedVotes.length);
-    
-    const ctx = chartCanvas.getContext('2d');
-    window.chart = new Chart(ctx, {
+
+    // Only set a sensible default height if none is defined.
+    if (!chartCanvas.style.height) chartCanvas.style.height = '600px';
+
+    // Destroy previous chart instance if present
+    if (window.chart) {
+        try { window.chart.destroy(); } catch (e) { /* ignore */ }
+        window.chart = null;
+    }
+
+    console.log('Creating chart with votes:', Array.isArray(sortedVotes) ? sortedVotes.length : 0);
+
+    // Robust numeric parsing for points (accept numbers, numeric-strings, or fallbacks)
+    const parseNum = v => {
+        if (v === undefined || v === null || v === '') return 0;
+        const n = Number(String(v).replace(/[^0-9.\-]/g, ''));
+        return isNaN(n) ? 0 : n;
+    };
+
+    const safeVotes = Array.isArray(sortedVotes) ? sortedVotes : [];
+    const dataPoints = safeVotes.map(v => parseNum(v?.pointsFinal ?? v?.points));
+    const labels = safeVotes.map(v => v?.songName ?? '');
+
+    console.log('Chart dataPoints sample (first 10):', dataPoints.slice(0, 10));
+    console.log('Chart labels sample (first 10):', labels.slice(0, 10));
+    console.log('Canvas offset size:', chartCanvas.offsetWidth, chartCanvas.offsetHeight, 'computed height:', window.getComputedStyle(chartCanvas).height);
+
+    // Use passed context if provided (handleWeeklySummaryUpdate passes ctx), otherwise get from canvas
+    const context = ctx || chartCanvas.getContext('2d');
+    if (!context) {
+        console.error('Unable to obtain 2D context for weekSummaryChart');
+        return;
+    }
+
+    // Create Chart.js instance with initial data (may be empty)
+    window.chart = new Chart(context, {
         type: 'bar',
         data: {
-            labels: sortedVotes.map(v => v.songName),
+            labels: labels,
             datasets: [{
                 label: 'Total Points',
-                data: sortedVotes.map(v => parseInt(v.pointsFinal)),
-                backgroundColor: 'rgba(90, 30, 90, 0.6)',
+                data: dataPoints,
+                backgroundColor: 'rgba(90, 30, 90, 0.85)',
                 borderColor: 'rgba(90, 30, 90, 1)',
                 borderWidth: 1
             }]
@@ -627,44 +657,71 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek) {
             responsive: true,
             maintainAspectRatio: false,
             indexAxis: 'y',
+            animation: { duration: 300 },
             layout: {
-                padding: {
-                    left: 15,
-                    right: 15,
-                    top: 20,
-                    bottom: 20
-                }
+                padding: { left: 15, right: 15, top: 20, bottom: 20 }
             },
             scales: {
                 y: {
-                    ticks: {
-                        color: '#ffffff',
-                        font: { size: 14, weight: 'bold' },
-                        padding: 10
-                    },
-                    grid: {
-                        color: 'rgba(255,255,255,.15)'
-                    }
+                    ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' }, padding: 10 },
+                    grid: { color: 'rgba(255,255,255,.15)' }
                 },
                 x: {
-                    ticks: {
-                        color: '#ffffff',
-                        font: { size: 14, weight: 'bold' }
-                    },
-                    grid: {
-                        color: 'rgba(255,255,255,.15)'
-                    }
+                    ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' } },
+                    grid: { color: 'rgba(255,255,255,.15)' }
                 }
             },
             plugins: {
                 legend: { display: false },
                 title: {
                     display: true,
-                    text: `Week ${selectedWeek} Points Distribution`,
+                    text: `${selectedWeek} Points Distribution`,
                     color: '#ffffff',
                     font: { size: 18, weight: 'bold' }
                 }
             }
         }
     });
+
+    // Defensive fallback: if Chart.js ended up with empty labels/data, set them explicitly and force an update.
+    try {
+        const hasEmptyData = (Array.isArray(window.chart.data.labels) && window.chart.data.labels.length === 0)
+            || (Array.isArray(window.chart.data.datasets?.[0]?.data) && window.chart.data.datasets[0].data.length === 0);
+
+        if (hasEmptyData && dataPoints.length > 0) {
+            console.warn('Chart initialized with empty data — applying fallback assignment and forcing update.');
+            window.chart.data.labels = labels;
+            if (!window.chart.data.datasets) window.chart.data.datasets = [{ label: 'Total Points', data: [] }];
+            window.chart.data.datasets[0].data = dataPoints;
+            // Ensure visible dataset
+            if (typeof window.chart.setDatasetVisibility === 'function') {
+                try { window.chart.setDatasetVisibility(0, true); } catch (e) {}
+            }
+            window.chart.update();
+            console.log('Fallback chart update applied. labels/data lengths:', window.chart.data.labels.length, window.chart.data.datasets[0].data.length);
+        } else {
+            window.chart.update();
+        }
+    } catch (e) {
+        console.warn('chart.update() or fallback assignment failed:', e);
+    }
+
+    // Extra fallback: re-assign labels/data on the next tick if Chart.js clears them asynchronously.
+    setTimeout(() => {
+        if (!window.chart) return;
+        try {
+            const currentLabelsLen = Array.isArray(window.chart.data.labels) ? window.chart.data.labels.length : 0;
+            const currentDataLen = Array.isArray(window.chart.data.datasets?.[0]?.data) ? window.chart.data.datasets[0].data.length : 0;
+            if ((currentLabelsLen === 0 || currentDataLen === 0) && dataPoints.length > 0) {
+                console.warn('Applying setTimeout fallback to populate chart data');
+                window.chart.data.labels = labels;
+                if (!window.chart.data.datasets) window.chart.data.datasets = [{ label: 'Total Points', data: [] }];
+                window.chart.data.datasets[0].data = dataPoints;
+                try { window.chart.update(); } catch (e) { console.warn('setTimeout chart.update failed', e); }
+                console.log('setTimeout fallback applied. labels/data lengths now:', window.chart.data.labels.length, window.chart.data.datasets[0].data.length);
+            }
+        } catch (e) {
+            console.warn('setTimeout fallback failed:', e);
+        }
+    }, 50);
 }
