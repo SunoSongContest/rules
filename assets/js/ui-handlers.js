@@ -140,7 +140,7 @@ function updateSongSelect() {
     songSelect.innerHTML = '<option value="">Select Song</option>';
 
     if (selectedWeek && window.votes) {
-        const weekSongs = window.votes.filter(s => s.stage === selectedWeek && parseInt(s.pointsFinal) > 0);
+        const weekSongs = window.votes.filter(s => String(s.stage) === String(selectedWeek) && parseInt(s.pointsFinal) > 0);
         
         weekSongs.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
         

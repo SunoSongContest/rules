@@ -146,44 +146,133 @@ function parseSubmissionsCSV(csv) {
     return result;
 }
 
-function parseVotesCSV(csv) {
-    const lines = csv.split('\n');
+function parseVotesCSV(csv, editionConfig = {}) {
+    // Flexible votes parser + normalizer
+    // Produces canonical vote objects with fields:
+    // id, songName, stage, pointsRaw, bonusPoints, pointsFinal,
+    // votes12..votes1, numVoters, avgPoints, weeklyRank, result, _rawRow
+    const lines = csv.split('\n').filter(l => l.trim());
+    if (lines.length <= 1) return [];
+
+    // Detect header row
+    const headerParts = lines[0].split(',');
+    const hasHeader = headerParts.some(h => /song|title|week|points|vote/i.test(h));
+
+    const rows = hasHeader ? lines.slice(1) : lines.slice(1);
     const result = [];
 
-    for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        
-        const values = lines[i].split(',');
-        result.push({
-            id: values[0],
-            songName: values[1],
-            week: values[2],
-            points: values[3],
-            votes12: values[4],
-            votes10: values[5],
-            votes8: values[6],
-            votes7: values[7],
-            votes6: values[8],
-            votes5: values[9],
-            votes4: values[10],
-            votes3: values[11],
-            votes2: values[12],
-            votes1: values[13],
-            numVoters: values[14],
-            avgPoints: values[15],
-            weeklyRank: values[16],
-            result: values[17]  // Add this line
-        });
+    // Legacy index map fallback
+    const legacyMap = {
+        id: 0,
+        songName: 1,
+        week: 2,
+        points: 3,
+        votes12: 4,
+        votes10: 5,
+        votes8: 6,
+        votes7: 7,
+        votes6: 8,
+        votes5: 9,
+        votes4: 10,
+        votes3: 11,
+        votes2: 12,
+        votes1: 13,
+        numVoters: 14,
+        avgPoints: 15,
+        weeklyRank: 16,
+        result: 17
+    };
+
+    const colMap = (editionConfig && editionConfig.columnMap) ? editionConfig.columnMap : legacyMap;
+    const bonusCfg = editionConfig?.rules?.bonusHandling || { enabled: false };
+
+    const parseNum = v => {
+        if (v === undefined || v === null || v === '') return 0;
+        const n = parseInt(String(v).replace(/[^0-9-]/g, ''), 10);
+        return isNaN(n) ? 0 : n;
+    };
+
+    for (let i = 0; i < rows.length; i++) {
+        const line = rows[i];
+        const values = line.split(',');
+
+        const getByIndexOrName = (key) => {
+            const idx = colMap[key];
+            if (typeof idx === 'number' && values[idx] !== undefined) return values[idx];
+            if (hasHeader) {
+                const headerIndex = headerParts.findIndex(h => new RegExp(key, 'i').test(h));
+                if (headerIndex >= 0) return values[headerIndex];
+            }
+            return undefined;
+        };
+
+        const id = getByIndexOrName('id') ?? (i + 1).toString();
+        const songName = (getByIndexOrName('songName') || getByIndexOrName('song_title') || '').trim();
+        const stageLabel = (getByIndexOrName('stageLabel') || getByIndexOrName('week') || getByIndexOrName('stage') || '').trim();
+        const pointsRawStr = getByIndexOrName('pointsRaw') || getByIndexOrName('points') || '0';
+
+        const votes12 = getByIndexOrName('votes12') || '0';
+        const votes10 = getByIndexOrName('votes10') || '0';
+        const votes8 = getByIndexOrName('votes8') || '0';
+        const votes7 = getByIndexOrName('votes7') || '0';
+        const votes6 = getByIndexOrName('votes6') || '0';
+        const votes5 = getByIndexOrName('votes5') || '0';
+        const votes4 = getByIndexOrName('votes4') || '0';
+        const votes3 = getByIndexOrName('votes3') || '0';
+        const votes2 = getByIndexOrName('votes2') || '0';
+        const votes1 = getByIndexOrName('votes1') || '0';
+
+        const numVoters = getByIndexOrName('numVoters') || getByIndexOrName('voters') || '0';
+        const avgPoints = getByIndexOrName('avgPoints') || '0';
+        const weeklyRank = getByIndexOrName('weeklyRank') || '';
+        const resultFlag = (getByIndexOrName('result') || '').trim();
+
+        const pointsRaw = parseNum(pointsRawStr);
+
+        // Bonus handling
+        let bonusPoints = 0;
+        if (bonusCfg?.enabled) {
+            if (typeof colMap.bonusPoints === 'number' && values[colMap.bonusPoints] !== undefined) {
+                bonusPoints = parseNum(values[colMap.bonusPoints]);
+            } else if (hasHeader) {
+                const bonusIdx = headerParts.findIndex(h => /bonus/i.test(h));
+                if (bonusIdx >= 0) bonusPoints = parseNum(values[bonusIdx]);
+            }
+        }
+
+        const pointsFinal = bonusCfg?.pointsIncludeBonus ? pointsRaw : (pointsRaw + (bonusPoints || 0));
+
+        const canonical = {
+            id: String(id),
+            songName: songName,
+            stage: stageLabel || '',        // canonical stage/week label
+            pointsRaw: pointsRaw,
+            bonusPoints: bonusPoints,
+            pointsFinal: pointsFinal,
+            votes12: parseNum(votes12),
+            votes10: parseNum(votes10),
+            votes8: parseNum(votes8),
+            votes7: parseNum(votes7),
+            votes6: parseNum(votes6),
+            votes5: parseNum(votes5),
+            votes4: parseNum(votes4),
+            votes3: parseNum(votes3),
+            votes2: parseNum(votes2),
+            votes1: parseNum(votes1),
+            numVoters: parseNum(numVoters),
+            avgPoints: parseFloat(avgPoints) || 0,
+            weeklyRank: weeklyRank,
+            result: resultFlag,
+            _rawRow: values
+        };
+
+        result.push(canonical);
     }
 
+    console.log('Parsed and normalized votes data (preview):', result.slice(0,5));
     return result;
 }
 
-function getWeeksFromVotes(votesData) {
-    // Get unique week values
-    const weeks = new Set(votesData.map(vote => vote.week));
-    console.log('Detected weeks:', [...weeks]);
-}    
 function parseVotesCSV(csv) {
     const lines = csv.split('\n');
     const result = [];
@@ -361,22 +450,45 @@ async function updateAudioPlayer(songUrl) {
         );
     }
 }
-function getWeeksFromVotes(votesData) {
-    // Get unique week values
-    const weeks = new Set(votesData.map(vote => vote.week));
-    console.log('Detected weeks:', [...weeks]);
-    
-    // Filter and sort numeric weeks
-    const numericWeeks = [...weeks]
-        .filter(week => !isNaN(week))
-        .map(Number)
-        .sort((a, b) => a - b);
-    
-    // Add special weeks in correct order
-    if (weeks.has('2nd-chance')) numericWeeks.push('2nd-chance');
-    if (weeks.has('Finals')) numericWeeks.push('Finals');
-    
-    return numericWeeks;
+/**
+ * Determine ordered weeks/stages for UI based on votes data and optional editionConfig.
+ * - If editionConfig.orderedStages exists, expand it (bunks, sequential weeks, single labels).
+ * - Otherwise infer order from the data, preferring "Bunk A..", "Showcase N", "Track Save", "2nd-chance", "Finals".
+ */
+function getWeeksFromVotes(votesData, editionConfig = {}) {
+    // Simplified: derive unique stage labels from votesData and return them
+    // in a sensible order. Ignore editionConfig for now to avoid mismatches.
+    if (!Array.isArray(votesData)) return [];
+
+    const stages = [...new Set(votesData.map(v => (v.stage ?? v.week ?? v.stageLabel ?? '').toString()).filter(Boolean))];
+
+    // Separate numeric and non-numeric
+    const numeric = stages.filter(s => !isNaN(s)).map(Number).sort((a, b) => a - b).map(String);
+    const alphas = stages.filter(s => isNaN(s));
+
+    // Preferred ordering heuristics for alpha labels
+    const bunkRegex = /^bunk\s*([A-Za-z])$/i;
+    const showcaseRegex = /showcase\s*(\d+)/i;
+
+    const bunks = alphas.filter(s => bunkRegex.test(s)).sort((a, b) => {
+        const ma = a.match(bunkRegex)[1].toUpperCase();
+        const mb = b.match(bunkRegex)[1].toUpperCase();
+        return ma.localeCompare(mb);
+    });
+
+    const showcases = alphas.filter(s => showcaseRegex.test(s)).sort((a, b) => {
+        const na = parseInt(a.match(showcaseRegex)[1], 10);
+        const nb = parseInt(b.match(showcaseRegex)[1], 10);
+        return na - nb;
+    });
+
+    const trackSaves = alphas.filter(s => /track\s*save/i.test(s));
+    const secondChances = alphas.filter(s => /2nd|second\s*chance/i.test(s));
+    const finals = alphas.filter(s => /final/i.test(s));
+
+    const remaining = alphas.filter(s => ![...bunks, ...showcases, ...trackSaves, ...secondChances, ...finals].includes(s)).sort();
+
+    return [...numeric, ...bunks, ...showcases, ...trackSaves, ...secondChances, ...finals, ...remaining];
 }
 
 function initializeSelects(weeks) {
@@ -386,7 +498,18 @@ function initializeSelects(weeks) {
     weekSelect.innerHTML = '<option value="">Select Week</option>';
     summaryWeekSelect.innerHTML = '<option value="">Select Week</option>';
     
-    weeks.forEach(week => {
+    console.log('initializeSelects called with weeks:', weeks);
+    
+    // Fallback: if weeks is empty, derive from window.votes
+    let effectiveWeeks = weeks;
+    if (!effectiveWeeks || !Array.isArray(effectiveWeeks) || effectiveWeeks.length === 0) {
+        console.warn('initializeSelects: received empty weeks; deriving from window.votes');
+        effectiveWeeks = [...new Set((window.votes || []).map(v => (v.stage ?? v.week ?? v.stageLabel ?? '').toString()).filter(Boolean))];
+    }
+    
+    console.log('initializeSelects effectiveWeeks:', effectiveWeeks);
+    
+    effectiveWeeks.forEach(week => {
         const option = document.createElement('option');
         option.value = week;
         option.textContent = isNaN(week) ? week : `Week ${week}`;
