@@ -155,9 +155,11 @@ async function updateVisualization() {
         v.songName === selectedSong &&
         (String(v.stage) === String(selectedWeek) || String(v.week) === String(selectedWeek))
     );
-
-    const submissionData = window.submissions.find(s => s.songTitle === (songData && songData.songName));
-
+    
+    const submissionData = (typeof window.findSubmissionBySongName === 'function')
+        ? window.findSubmissionBySongName(songData && songData.songName)
+        : ((window.submissions || []).find(s => s.songTitle === (songData && songData.songName)) || undefined);
+    
     if (!songData || !submissionData) {
         console.warn('Song or submission data not found for selection:', selectedSong, selectedWeek);
         if (statsContainer) statsContainer.style.display = 'none';

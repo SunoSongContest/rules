@@ -287,15 +287,31 @@ function parseSubmissionsCSV(csv) {
 /* Helper: normalize song titles for matching (strip bracketed suffixes like "[SSC7, USA]") */
 function normalizeSongTitle(title) {
     if (!title && title !== 0) return '';
+    // Coerce and trim
     let t = String(title).trim();
 
-    // Remove any bracketed suffix (e.g. " [SSC7, USA]" or " [SSC7]")
-    t = t.replace(/\s*\[.*$/g, '');
+    // Normalize smart quotes/dashes to ASCII equivalents
+    t = t.replace(/[“”„‟"]/g, '"').replace(/[‘’‛']/g, "'").replace(/[\u2013\u2014]/g, '-');
 
-    // Remove surrounding quotes
+    // Remove only trailing bracketed suffixes (safer than removing from first '[')
+    // e.g. "What Am I Doing? [SSC7, United States]" -> "What Am I Doing?"
+    t = t.replace(/\s*\[[^\]]*\]\s*$/g, '');
+
+    // Remove surrounding quotes/apostrophes
     t = t.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
 
-    // Collapse repeated whitespace and lower-case for robust comparison
+    // Unicode normalize and strip diacritics
+    try {
+        t = t.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    } catch (e) {
+        // ignore if normalize not supported
+    }
+
+    // Remove punctuation except letters, numbers, spaces, apostrophes and hyphens
+    // This keeps contractions and hyphenated words but strips stray commas/colons/brackets/etc.
+    t = t.replace(/[^\p{L}\p{N}\s'-]+/gu, '');
+
+    // Collapse repeated whitespace and lowercase for robust comparison
     t = t.replace(/\s+/g, ' ').trim().toLowerCase();
 
     return t;
@@ -576,7 +592,7 @@ function initializeWeekListeners() {
             );
             const submissionData = (typeof window.findSubmissionBySongName === 'function')
                 ? window.findSubmissionBySongName(selectedSong)
-                : (window.submissions || []).find(s => s.songTitle === selectedSong);
+                : ((window.submissions || []).find(s => s.songTitle === selectedSong) || undefined);
             
             if (songData && submissionData) {
                 // Update stats display

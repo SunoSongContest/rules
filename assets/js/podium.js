@@ -79,19 +79,25 @@ async function updatePodium(weekVotes) {
         let finalsHTML = '<div class="finals-podium"><div class="winners-row">';
 
         if (secondPlace) {
-            const submission = window.submissions?.find(s => s.songTitle === secondPlace.songName) || {};
+            const submission = (typeof window.findSubmissionBySongName === 'function')
+                ? (window.findSubmissionBySongName(secondPlace.songName) || {})
+                : ((window.submissions || []).find(s => s.songTitle === secondPlace.songName) || {});
             const songInfo = await safeGetSongInfo(submission);
             finalsHTML += createPodiumHTML(secondPlace, submission, songInfo, 'medium');
         }
 
         if (winner) {
-            const submission = window.submissions?.find(s => s.songTitle === winner.songName) || {};
+            const submission = (typeof window.findSubmissionBySongName === 'function')
+                ? (window.findSubmissionBySongName(winner.songName) || {})
+                : ((window.submissions || []).find(s => s.songTitle === winner.songName) || {});
             const songInfo = await safeGetSongInfo(submission);
             finalsHTML += createPodiumHTML(winner, submission, songInfo, 'large');
         }
 
         if (thirdPlace) {
-            const submission = window.submissions?.find(s => s.songTitle === thirdPlace.songName) || {};
+            const submission = (typeof window.findSubmissionBySongName === 'function')
+                ? (window.findSubmissionBySongName(thirdPlace.songName) || {})
+                : ((window.submissions || []).find(s => s.songTitle === thirdPlace.songName) || {});
             const songInfo = await safeGetSongInfo(submission);
             finalsHTML += createPodiumHTML(thirdPlace, submission, songInfo, 'medium');
         }
@@ -99,7 +105,9 @@ async function updatePodium(weekVotes) {
         finalsHTML += '</div>';
 
         if (bbn) {
-            const submission = window.submissions?.find(s => s.songTitle === bbn.songName) || {};
+            const submission = (typeof window.findSubmissionBySongName === 'function')
+                ? (window.findSubmissionBySongName(bbn.songName) || {})
+                : ((window.submissions || []).find(s => s.songTitle === bbn.songName) || {});
             const songInfo = await safeGetSongInfo(submission);
             finalsHTML += `
                 <div class="bbn-row">
@@ -163,7 +171,9 @@ async function updatePodium(weekVotes) {
         let finalistsHTML = `<div class="podium-section"><h2 class="finalists-title">${finalistsLabel}</h2><div class="podium-container">`;
     
         for (const song of usedFinalists) {
-            const submission = window.submissions?.find(s => s.songTitle === song.songName);
+            const submission = (typeof window.findSubmissionBySongName === 'function')
+                ? (window.findSubmissionBySongName(song.songName) || {})
+                : ((window.submissions || []).find(s => s.songTitle === song.songName) || {});
             const safeSubmission = submission || {};
             const songInfo = await safeGetSongInfo(safeSubmission);
             finalistsHTML += createPodiumHTML(song, safeSubmission, songInfo);
@@ -177,7 +187,9 @@ async function updatePodium(weekVotes) {
             let secondChanceHTML = `<div class="podium-section second-chance-podium"><h2 class="second-chance-title">${secondLabel}</h2><div class="podium-container">`;
     
             for (const song of usedSecondChance) {
-                const submission = window.submissions?.find(s => s.songTitle === song.songName);
+                const submission = (typeof window.findSubmissionBySongName === 'function')
+                    ? (window.findSubmissionBySongName(song.songName) || {})
+                    : ((window.submissions || []).find(s => s.songTitle === song.songName) || {});
                 const safeSubmission = submission || {};
                 const songInfo = await safeGetSongInfo(safeSubmission);
                 secondChanceHTML += createPodiumHTML(song, safeSubmission, songInfo);
@@ -255,7 +267,9 @@ function escapeHtml(text) {
  */
 async function createPodiumItem(song, size = 'medium') {
     if (!song) return '';
-    const submission = (window.submissions || []).find(s => s.songTitle === song.songName) || {};
+    const submission = (typeof window.findSubmissionBySongName === 'function')
+        ? (window.findSubmissionBySongName(song.songName) || {})
+        : ((window.submissions || []).find(s => s.songTitle === song.songName) || {});
     const songInfo = await safeGetSongInfo(submission);
     const sizeClasses = {
         large: 'podium-item-large',

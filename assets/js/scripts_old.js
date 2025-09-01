@@ -181,7 +181,9 @@ async function updatePodium(weekVotes) {
         podiumSection.style.display = 'block';
         // Create finalist podium items...
         for (let song of finalists) {
-            const submission = submissions.find(s => s.songTitle === song.songName);
+            const submission = (typeof window.findSubmissionBySongName === 'function')
+                ? window.findSubmissionBySongName(song.songName)
+                : submissions.find(s => s.songTitle === song.songName);
             if (!submission) continue;
           
             const songId = getSongIdFromUrl(submission.songUrl);
@@ -214,7 +216,9 @@ async function updatePodium(weekVotes) {
             secondChanceSection.style.display = 'block';
             // Create second chance podium items...
             for (let song of secondChance) {
-                const submission = submissions.find(s => s.songTitle === song.songName);
+                const submission = (typeof window.findSubmissionBySongName === 'function')
+                    ? window.findSubmissionBySongName(song.songName)
+                    : submissions.find(s => s.songTitle === song.songName);
                 if (!submission) continue;
                 
                 const songId = getSongIdFromUrl(submission.songUrl);
@@ -648,7 +652,9 @@ async function updateVisualization() {
     }
 
     const songData = votes.find(v => v.songName === selectedSong && v.week === selectedWeek);
-    const submissionData = submissions.find(s => s.songTitle === songData.songName);
+    const submissionData = (typeof window.findSubmissionBySongName === 'function')
+        ? window.findSubmissionBySongName(songData && songData.songName)
+        : submissions.find(s => s.songTitle === (songData && songData.songName));
     
     // Get song ID from URL
     const songId = getSongIdFromUrl(submissionData.songUrl);
