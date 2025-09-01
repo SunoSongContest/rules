@@ -117,49 +117,76 @@ async function updatePodium(weekVotes) {
     // We expect CSV 'result' flags to mark 'Finalist' and '2nd Chance' (or variants).
     const finalists = sortedSongs.filter(song => normalizeResult(song.result) === 'finalist' || normalizeResult(song.result) === 'finalists');
     const secondChance = sortedSongs.filter(song => normalizeResult(song.result).includes('2nd') || normalizeResult(song.result).includes('secondchance') || normalizeResult(song.result).includes('2ndchance') || normalizeResult(song.result).includes('2ndchance'));
-
+    
+    // Detect "Group" weeks (e.g., "Group A", "Group B") and apply SSC7 group advancement rules:
+    // - 20 move to Showcase (or marked "Showcase")
+    // - next 20 move to Track Save Week (or marked "Track save week")
+    const isGroupStage = stageSamples.some(s => /\bgroup\b/i.test(s));
+    const finalistsLabel = isGroupStage ? 'Showcase' : 'Finalists';
+    const secondLabel = isGroupStage ? 'Track Save Week' : 'Second Chance';
+    
     // If the CSV doesn't include explicit result flags, gracefully derive finalists from top N
     // (This keeps compatibility when raw CSVs just list top songs)
     const maybeDeriveFinalists = () => {
         if (finalists.length > 0) return finalists;
-        // Heuristic: top 5 are finalists and 6-10 are second chance for legacy numeric weekly shows
+        // Heuristic for legacy numeric weekly shows: top 5 are finalists and 6-10 are second chance
         const legacyFinals = sortedSongs.slice(0, 5);
-        const legacySecond = sortedSongs.slice(5, 10);
         return legacyFinals;
     };
-
-    const usedFinalists = finalists.length > 0 ? finalists : maybeDeriveFinalists();
-    const usedSecondChance = secondChance.length > 0 ? secondChance : sortedSongs.slice(5, 10);
-
-    console.log('Regular week songs:', { usedFinalistsCount: usedFinalists.length, usedSecondChanceCount: usedSecondChance.length });
-
+    
+    let usedFinalists = [];
+    let usedSecondChance = [];
+    
+    if (isGroupStage) {
+        // Prefer explicit 'Showcase' / 'Track save' result flags if present
+        usedFinalists = sortedSongs.filter(s => normalizeResult(s.result).includes('showcase'));
+        if (usedFinalists.length === 0) {
+            // Fallback: top 20
+            usedFinalists = sortedSongs.slice(0, 20);
+        }
+    
+        usedSecondChance = sortedSongs.filter(s => normalizeResult(s.result).includes('track') || normalizeResult(s.result).includes('tracksave') || normalizeResult(s.result).includes('tracksaveweek') || normalizeResult(s.result).includes('tracksaveweek'));
+        if (usedSecondChance.length === 0) {
+            // Fallback: songs 21-40
+            usedSecondChance = sortedSongs.slice(20, 40);
+        }
+    } else {
+        // Non-group handling: prefer explicit flags, otherwise derive legacy top-5 + 6-10
+        usedFinalists = finalists.length > 0 ? finalists : maybeDeriveFinalists();
+        usedSecondChance = secondChance.length > 0 ? secondChance : sortedSongs.slice(5, 10);
+    }
+    
+    console.log('Regular week songs:', { usedFinalistsCount: usedFinalists.length, usedSecondChanceCount: usedSecondChance.length, isGroupStage });
+    
     if (usedFinalists.length > 0) {
         podiumSection.style.display = 'block';
-        let finalistsHTML = '<div class="podium-section"><h2>Finalists</h2><div class="podium-container">';
-
+        let finalistsHTML = `<div class="podium-section"><h2 class="finalists-title">${finalistsLabel}</h2><div class="podium-container">`;
+    
         for (const song of usedFinalists) {
             const submission = window.submissions?.find(s => s.songTitle === song.songName);
             const safeSubmission = submission || {};
             const songInfo = await safeGetSongInfo(safeSubmission);
             finalistsHTML += createPodiumHTML(song, safeSubmission, songInfo);
         }
-
+    
         finalistsHTML += '</div></div>';
         finalistsPodium.innerHTML = finalistsHTML;
-
+    
         if (usedSecondChance.length > 0) {
             secondChanceSection.style.display = 'block';
-            let secondChanceHTML = '<div class="podium-section"><h2>Second Chance</h2><div class="podium-container">';
-
+            let secondChanceHTML = `<div class="podium-section second-chance-podium"><h2 class="second-chance-title">${secondLabel}</h2><div class="podium-container">`;
+    
             for (const song of usedSecondChance) {
                 const submission = window.submissions?.find(s => s.songTitle === song.songName);
                 const safeSubmission = submission || {};
                 const songInfo = await safeGetSongInfo(safeSubmission);
                 secondChanceHTML += createPodiumHTML(song, safeSubmission, songInfo);
             }
-
+    
             secondChanceHTML += '</div></div>';
             secondChancePodium.innerHTML = secondChanceHTML;
+        } else {
+            secondChanceSection.style.display = 'none';
         }
     } else {
         podiumSection.style.display = 'none';

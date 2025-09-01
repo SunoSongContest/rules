@@ -84,13 +84,27 @@ window.CSV_MANIFEST = {
                { id: 'second_chance', label: '2nd Chance', type: 'single', labelValue: '2nd-chance' },
                { id: 'finals', label: 'Finals', type: 'single', labelValue: 'Finals' }
            ],
-           // NOTE: edition-specific advancement rules (bunks, track-save, 2nd-chance, bonus handling)
-           // were removed from the manifest to simplify configuration.
-           // The votes parser now auto-detects a bonus column (via `columnMap.bonusPoints` or a
-           // header containing "bonus") and, by default, includes bonus points in the computed
-           // `pointsFinal` (pointsFinal = pointsRaw + bonusPoints). If an edition requires custom
-           // advancement rules, they can be implemented in code or re-added here.
-       }
+           // Edition-specific advancement rules for SSC7:
+           // - For Group weeks (e.g., "Group A", "Group B") advance:
+           //     * top 20 => Showcase (or marked "Showcase")
+           //     * next 20 => Track Save Week (or marked "Track Save Week")
+           // - For non-group weeks, fall back to top 5 finalists + 5 second chance.
+           // The UI and normalization layer will prefer explicit 'result' flags in the CSV when present,
+           // otherwise apply these counts using descending points ordering.
+           advancement: {
+               groupStage: {
+                   showcaseCount: 20,
+                   trackSaveCount: 20,
+                   // selection by descending points; if CSV has explicit result flags those are used first
+                   selection: 'by_points'
+               },
+               nonGroup: {
+                   finalistsCount: 5,
+                   secondChanceCount: 5,
+                   selection: 'by_points'
+               }
+           }
+       },
    },
 
    // Return the raw files object for an edition
