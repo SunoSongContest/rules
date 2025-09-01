@@ -631,6 +631,10 @@ tag: tool
                     <h3>Total Points</h3>
                     <p id="totalPoints">-</p>
                 </div>
+                <div class="stat-card" id="bonusPointsCard" style="display: none;">
+                    <h3>Bonus Points</h3>
+                    <p id="bonusPoints">-</p>
+                </div>
                 <div class="stat-card">
                     <h3>Weekly Rank</h3>
                     <p id="weeklyRank">-</p>

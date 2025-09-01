@@ -210,6 +210,25 @@ async function updateVisualization() {
     document.getElementById('totalVoters').textContent = songData.numVoters ?? songData.num_voters ?? '-';
     document.getElementById('totalPoints').textContent = songData.pointsFinal ?? songData.points ?? '-';
     document.getElementById('weeklyRank').textContent = songData.weeklyRank ?? songData.weekly_rank ?? '-';
+    
+    // Bonus points: show separately when available
+    try {
+        const bonus = (songData.bonusPoints ?? songData.bonus_points ?? 0);
+        const bonusCard = document.getElementById('bonusPointsCard');
+        const bonusEl = document.getElementById('bonusPoints');
+        if (bonusCard && bonusEl) {
+            if (Number(bonus) && Number(bonus) !== 0) {
+                bonusEl.textContent = String(bonus);
+                bonusCard.style.display = ''; // default / inherit from CSS grid
+            } else {
+                bonusEl.textContent = '-';
+                bonusCard.style.display = 'none';
+            }
+        }
+    } catch (e) {
+        // defensive: ignore if DOM elements missing
+        console.warn('Failed to render bonus points', e);
+    }
 
     // Update chart with vote distribution (chart expects votes12..votes1)
     updateChart(songData);

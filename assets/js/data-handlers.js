@@ -409,6 +409,24 @@ function initializeWeekListeners() {
                 document.getElementById('totalPoints').textContent = songData.pointsFinal;
                 document.getElementById('weeklyRank').textContent = songData.weeklyRank;
                 
+                // Bonus: show separate bonus points card if present and non-zero
+                try {
+                    const bonus = (songData.bonusPoints ?? songData.bonus_points ?? 0);
+                    const bonusCard = document.getElementById('bonusPointsCard');
+                    const bonusEl = document.getElementById('bonusPoints');
+                    if (bonusCard && bonusEl) {
+                        if (Number(bonus) && Number(bonus) !== 0) {
+                            bonusEl.textContent = String(bonus);
+                            bonusCard.style.display = ''; // show card
+                        } else {
+                            bonusEl.textContent = '-';
+                            bonusCard.style.display = 'none';
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to render bonus points', e);
+                }
+                
                 // Create/update audio player and visualizer
                 await updateAudioPlayer(submissionData.songUrl);
                 
