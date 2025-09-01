@@ -263,12 +263,13 @@ function parseSubmissionsCSV(csv) {
         // Based on the submissions CSV structure:
         // index 0 => numeric id
         // index 1 => Discord Name
-        // index 2 => Discord Username
-        // index 3 => Song Title
-        // index 4 => Suno Username
+        // index 2 => Discord display name
+        // index 3 => Suno username
+        // index 4 => Song Title
         // index 5 => Song URL
-        const songTitle = values[3] || '';
-        const sunoUsername = values[4] || '';
+        // Defensive mapping: use header-like fallbacks if positions vary
+        const songTitle = values[4] || values[3] || '';
+        const sunoUsername = values[3] || values[4] || '';
         const songUrl = values[5] || '';
 
         // Only include if we have a song title
