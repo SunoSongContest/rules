@@ -284,6 +284,33 @@ function parseSubmissionsCSV(csv) {
     return result;
 }
 
+/* Helper: normalize song titles for matching (strip bracketed suffixes like "[SSC7, USA]") */
+function normalizeSongTitle(title) {
+    if (!title && title !== 0) return '';
+    let t = String(title).trim();
+
+    // Remove any bracketed suffix (e.g. " [SSC7, USA]" or " [SSC7]")
+    t = t.replace(/\s*\[.*$/g, '');
+
+    // Remove surrounding quotes
+    t = t.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+
+    // Collapse repeated whitespace and lower-case for robust comparison
+    t = t.replace(/\s+/g, ' ').trim().toLowerCase();
+
+    return t;
+}
+
+/* Helper: find a submission by song name using normalized comparison */
+function findSubmissionBySongName(songName) {
+    const norm = normalizeSongTitle(songName);
+    if (!Array.isArray(window.submissions)) return undefined;
+    return window.submissions.find(s => normalizeSongTitle(s.songTitle) === norm);
+}
+
+// Expose helper globally so other modules can use it
+window.findSubmissionBySongName = findSubmissionBySongName;
+
 function parseVotesCSV(csv, editionConfig = {}) {
     // Use robust CSV parsing to avoid splitting on commas inside quoted fields.
     const parsed = parseCSV(csv);
@@ -547,9 +574,9 @@ function initializeWeekListeners() {
                 v.songName === selectedSong &&
                 v.stage === selectedWeek
             );
-            const submissionData = window.submissions.find(s =>
-                s.songTitle === selectedSong
-            );
+            const submissionData = (typeof window.findSubmissionBySongName === 'function')
+                ? window.findSubmissionBySongName(selectedSong)
+                : (window.submissions || []).find(s => s.songTitle === selectedSong);
             
             if (songData && submissionData) {
                 // Update stats display
