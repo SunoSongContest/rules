@@ -69,23 +69,19 @@ How the manifest is used
 
 Bonus points handling
 
-The manifest supports edition-specific bonus handling configuration so the UI and normalization layer know whether to include bonus points in displayed totals and advancement calculations.
-
-Relevant example from the SSC7 sample manifest:
-- [`rules.bonusHandling`](assets/js/csv-manifest.js:105) contains:
-  - `enabled` (boolean) — whether a bonus column is present and should be considered.
-  - `columnName` (string) — the canonical column name mapped in `columnMap` where bonus points exist (e.g., `bonusPoints`). See the sample at [`assets/js/csv-manifest.js`](assets/js/csv-manifest.js:105).
-  - `pointsIncludeBonus` (boolean) — when true, the normalization should add the bonus value to the base points to produce `pointsFinal`. When false, `pointsFinal` should equal `pointsRaw` and `bonusPoints` should be shown separately.
-
-Normalization behavior (implementation notes)
-- If `rules.bonusHandling.enabled` is true and `columnMap` points to a bonus column index, the parser will read the bonus value (if present) and store it on the canonical object under `bonusPoints`. The parser code that reads CSV rows lives in [`assets/js/data-handlers.js`](assets/js/data-handlers.js:149).
-- Default behavior when no bonus column exists:
-  - `bonusPoints` is set to 0.
-  - `pointsFinal` falls back to `pointsRaw`.
-- If `pointsIncludeBonus === true`, normalization should compute:
-  - `pointsFinal = parseInt(pointsRaw) + parseInt(bonusPoints || 0)`
-  - otherwise `pointsFinal = parseInt(pointsRaw)`
-- All numeric fields should be parsed into numbers before sorting/advancement comparisons (see parsing and the usage in charts/podium code in [`assets/js/data-handlers.js`](assets/js/data-handlers.js:466)).
+The parser now auto-detects a bonus column and handles it consistently across editions. Detection and behavior:
+- Detection order:
+  1) If an edition's `columnMap` defines `bonusPoints` (numeric index), that column is used.
+  2) Otherwise, if the CSV header contains a column whose name includes "bonus" (case-insensitive), that column is used.
+- Default behavior:
+  - If a bonus column is found, its numeric value is parsed into the canonical `bonusPoints` field and is included in the canonical `pointsFinal` total by default:
+    - pointsFinal = parseInt(pointsRaw) + parseInt(bonusPoints || 0)
+  - If no bonus column exists, `bonusPoints` will be 0 and `pointsFinal` will equal `pointsRaw`.
+- Backwards compatibility:
+  - The loader still accepts legacy CSVs (with no header or different column order) when an appropriate `columnMap` is provided.
+- Implementation note:
+  - The parser implementation lives in [`assets/js/data-handlers.js`](assets/js/data-handlers.js:1). UI code expects canonical vote objects with `pointsRaw`, `bonusPoints`, and `pointsFinal`.
+- If you need edition-specific advancement or special rules (bunk advancement, track save behavior, etc.), those can be implemented outside the manifest or re-added to the manifest as needed.
 
 Practical guidance for adding a new edition with bonus points
 1. Add your CSV files into `assets/csv/` (votes + submissions).

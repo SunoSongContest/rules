@@ -84,30 +84,12 @@ window.CSV_MANIFEST = {
                { id: 'second_chance', label: '2nd Chance', type: 'single', labelValue: '2nd-chance' },
                { id: 'finals', label: 'Finals', type: 'single', labelValue: 'Finals' }
            ],
-           rules: {
-               // Bunk advancement: either top N per bunk or top M global. Configure as needed.
-               bunk: {
-                   advanceTopPerGroup: null,   // e.g., 2 means top 2 per bunk
-                   advanceTopGlobal: 20,      // top 20 overall from bunks advance to showcases
-                   advanceTargetStage: 'showcase'
-               },
-               // Track Save rules: top 5 -> finals, 6-10 -> 2nd chance
-               trackSave: {
-                   topToFinals: 5,
-                   rangeToSecondChance: [6, 10],
-                   advanceTargetStageForTop: 'finals',
-                   advanceTargetStageForRange: 'second_chance'
-               },
-               second_chance: {
-                   topToFinals: 5,
-                   advanceTargetStage: 'finals'
-               },
-               bonusHandling: {
-                   enabled: true,
-                   columnName: 'bonusPoints',
-                   pointsIncludeBonus: false
-               }
-           }
+           // NOTE: edition-specific advancement rules (bunks, track-save, 2nd-chance, bonus handling)
+           // were removed from the manifest to simplify configuration.
+           // The votes parser now auto-detects a bonus column (via `columnMap.bonusPoints` or a
+           // header containing "bonus") and, by default, includes bonus points in the computed
+           // `pointsFinal` (pointsFinal = pointsRaw + bonusPoints). If an edition requires custom
+           // advancement rules, they can be implemented in code or re-added here.
        }
    },
 

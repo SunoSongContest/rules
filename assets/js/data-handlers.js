@@ -210,18 +210,17 @@ function parseVotesCSV(csv, editionConfig = {}) {
     };
 
     const colMap = (editionConfig && editionConfig.columnMap) ? editionConfig.columnMap : legacyMap;
-    const bonusCfg = editionConfig?.rules?.bonusHandling || { enabled: false };
-
+ 
     const parseNum = v => {
         if (v === undefined || v === null || v === '') return 0;
         const n = parseInt(String(v).replace(/[^0-9-]/g, ''), 10);
         return isNaN(n) ? 0 : n;
     };
-
+ 
     for (let i = 0; i < rows.length; i++) {
         const line = rows[i];
         const values = line.split(',');
-
+ 
         const getByIndexOrName = (key) => {
             const idx = colMap[key];
             if (typeof idx === 'number' && values[idx] !== undefined) return values[idx];
@@ -231,12 +230,12 @@ function parseVotesCSV(csv, editionConfig = {}) {
             }
             return undefined;
         };
-
+ 
         const id = getByIndexOrName('id') ?? (i + 1).toString();
         const songName = (getByIndexOrName('songName') || getByIndexOrName('song_title') || '').trim();
         const stageLabel = (getByIndexOrName('stageLabel') || getByIndexOrName('week') || getByIndexOrName('stage') || '').trim();
         const pointsRawStr = getByIndexOrName('pointsRaw') || getByIndexOrName('points') || '0';
-
+ 
         const votes12 = getByIndexOrName('votes12') || '0';
         const votes10 = getByIndexOrName('votes10') || '0';
         const votes8 = getByIndexOrName('votes8') || '0';
@@ -247,26 +246,33 @@ function parseVotesCSV(csv, editionConfig = {}) {
         const votes3 = getByIndexOrName('votes3') || '0';
         const votes2 = getByIndexOrName('votes2') || '0';
         const votes1 = getByIndexOrName('votes1') || '0';
-
+ 
         const numVoters = getByIndexOrName('numVoters') || getByIndexOrName('voters') || '0';
         const avgPoints = getByIndexOrName('avgPoints') || '0';
         const weeklyRank = getByIndexOrName('weeklyRank') || '';
         const resultFlag = (getByIndexOrName('result') || '').trim();
-
+ 
         const pointsRaw = parseNum(pointsRawStr);
-
-        // Bonus handling
+ 
+        // Bonus handling (auto-detected).
+        // Detection order:
+        // 1) If the edition's columnMap defines `bonusPoints`, use that index.
+        // 2) Otherwise, if the CSV header contains a column with 'bonus' in its name, use that index.
+        // If found, parse the numeric value and include it in pointsFinal by default.
         let bonusPoints = 0;
-        if (bonusCfg?.enabled) {
-            if (typeof colMap.bonusPoints === 'number' && values[colMap.bonusPoints] !== undefined) {
-                bonusPoints = parseNum(values[colMap.bonusPoints]);
-            } else if (hasHeader) {
-                const bonusIdx = headerParts.findIndex(h => /bonus/i.test(h));
-                if (bonusIdx >= 0) bonusPoints = parseNum(values[bonusIdx]);
-            }
+        let bonusColumnIndex = undefined;
+        if (typeof colMap.bonusPoints === 'number') {
+            bonusColumnIndex = colMap.bonusPoints;
+        } else if (hasHeader) {
+            const bonusIdx = headerParts.findIndex(h => /bonus/i.test(h));
+            if (bonusIdx >= 0) bonusColumnIndex = bonusIdx;
         }
-
-        const pointsFinal = bonusCfg?.pointsIncludeBonus ? pointsRaw : (pointsRaw + (bonusPoints || 0));
+        if (typeof bonusColumnIndex === 'number' && values[bonusColumnIndex] !== undefined) {
+            bonusPoints = parseNum(values[bonusColumnIndex]);
+        }
+ 
+        // Default behavior: include bonusPoints in final points total.
+        const pointsFinal = pointsRaw + (bonusPoints || 0);
 
         const canonical = {
             id: String(id),
