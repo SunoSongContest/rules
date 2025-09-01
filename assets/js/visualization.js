@@ -340,37 +340,50 @@ async function getSongInfo(songId) {
 }
 function updateWeeklySummary() {
     const weekSelect = document.getElementById('summaryWeekSelect');
-    const selectedWeek = weekSelect.value;
+    const selectedWeek = weekSelect ? weekSelect.value : '';
     
     // Hide podium if no week selected
     const podiumSection = document.querySelector('.top-songs-podium');
-    podiumSection.style.display = selectedWeek ? 'block' : 'none';
+    if (podiumSection) podiumSection.style.display = selectedWeek ? 'block' : 'none';
     
     if (!selectedWeek) return;
     
-    const weekVotes = votes.filter(v => v.week === selectedWeek);
+    // Prefer canonical `stage` field. Support legacy `week` fallback.
+    const weekVotes = (window.votes || []).filter(v => {
+        const stageVal = (v.stage ?? v.week ?? '').toString();
+        return String(stageVal) === String(selectedWeek);
+    });
     
     // Destroy existing chart before creating new one
     if (window.chart) {
-        window.chart.destroy();
+        try { window.chart.destroy(); } catch (e) { /* ignore */ }
     }
     
     updatePodium(weekVotes);
     
     // Reset chart size before updating
     const chartCanvas = document.getElementById('weekSummaryChart');
-    chartCanvas.style.height = '1200px';
+    if (chartCanvas) chartCanvas.style.height = '1200px';
     
-    const sortedVotes = weekVotes.sort((a, b) => parseInt(b.points) - parseInt(a.points));
+    const sortedVotes = [...weekVotes].sort((a, b) => {
+        const pa = Number(a.pointsFinal ?? a.points ?? 0);
+        const pb = Number(b.pointsFinal ?? b.points ?? 0);
+        return pb - pa;
+    });
     
-    const ctx = document.getElementById('weekSummaryChart').getContext('2d');
+    const ctx = chartCanvas ? chartCanvas.getContext('2d') : null;
+    if (!ctx) {
+        console.error('updateWeeklySummary: canvas/context not available');
+        return;
+    }
+    
     window.chart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: sortedVotes.map(v => v.songName),
             datasets: [{
                 label: 'Total Points',
-                data: sortedVotes.map(v => parseInt(v.points)),
+                data: sortedVotes.map(v => Number(v.pointsFinal ?? v.points ?? 0)),
                 backgroundColor: 'rgba(90, 30, 90, 0.6)',
                 borderColor: 'rgba(90, 30, 90, 1)',
                 borderWidth: 1

@@ -154,37 +154,145 @@ if (window.votes && Array.isArray(window.votes)) {
         console.error('Error loading edition data:', error);
     }
 }
-function parseSubmissionsCSV(csv) {
-    const lines = csv.split('\n');
-    const result = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        
-        const values = lines[i].split(',');
-        result.push({
-            songTitle: values[4],
-            sunoUsername: values[3],
-            songUrl: values[5]
-        });
+function parseCSV(text) {
+    // Minimal, robust CSV parser that handles:
+    // - quoted fields (")
+    // - double-quoted quotes ("")
+    // - CRLF or LF line endings
+    // Returns array of rows, each row is array of column values (strings, unquoted).
+    const rows = [];
+    if (text === undefined || text === null) return rows;
+    const len = text.length;
+    let i = 0;
+    let cur = '';
+    let row = [];
+    let inQuotes = false;
+
+    while (i < len) {
+        const ch = text[i];
+
+        if (inQuotes) {
+            if (ch === '"') {
+                // Lookahead for double quote escape
+                if (i + 1 < len && text[i + 1] === '"') {
+                    cur += '"';
+                    i += 2;
+                    continue;
+                } else {
+                    inQuotes = false;
+                    i++;
+                    continue;
+                }
+            } else {
+                cur += ch;
+                i++;
+                continue;
+            }
+        }
+
+        // Not in quotes
+        if (ch === '"') {
+            inQuotes = true;
+            i++;
+            continue;
+        }
+
+        if (ch === ',') {
+            row.push(cur);
+            cur = '';
+            i++;
+            continue;
+        }
+
+        // Handle CRLF or LF line breaks
+        if (ch === '\r') {
+            // If CRLF, skip next LF
+            if (i + 1 < len && text[i + 1] === '\n') i++;
+            row.push(cur);
+            rows.push(row);
+            row = [];
+            cur = '';
+            i++;
+            continue;
+        }
+
+        if (ch === '\n') {
+            row.push(cur);
+            rows.push(row);
+            row = [];
+            cur = '';
+            i++;
+            continue;
+        }
+
+        cur += ch;
+        i++;
     }
-    
+
+    // Push any remaining value
+    if (inQuotes) {
+        // unterminated quote - still push what we have
+        row.push(cur);
+        rows.push(row);
+    } else {
+        if (cur !== '' || row.length > 0) {
+            row.push(cur);
+            rows.push(row);
+        }
+    }
+
+    return rows;
+}
+
+function parseSubmissionsCSV(csv) {
+    // Use the robust CSV parser to correctly handle quoted fields and commas inside fields.
+    const rows = parseCSV(csv);
+    const result = [];
+
+    if (!rows || rows.length <= 1) return result;
+
+    // Header is rows[0]; data starts from rows[1]
+    for (let i = 1; i < rows.length; i++) {
+        const values = rows[i];
+        if (!values || values.length === 0) continue;
+        // Defensive: trim all values
+        for (let j = 0; j < values.length; j++) {
+            if (typeof values[j] === 'string') values[j] = values[j].trim();
+        }
+
+        // Based on the submissions CSV structure:
+        // index 0 => numeric id
+        // index 1 => Discord Name
+        // index 2 => Discord Username
+        // index 3 => Song Title
+        // index 4 => Suno Username
+        // index 5 => Song URL
+        const songTitle = values[3] || '';
+        const sunoUsername = values[4] || '';
+        const songUrl = values[5] || '';
+
+        // Only include if we have a song title
+        if (songTitle) {
+            result.push({
+                songTitle,
+                sunoUsername,
+                songUrl
+            });
+        }
+    }
+
     return result;
 }
 
 function parseVotesCSV(csv, editionConfig = {}) {
-    // Flexible votes parser + normalizer
-    // Produces canonical vote objects with fields:
-    // id, songName, stage, pointsRaw, bonusPoints, pointsFinal,
-    // votes12..votes1, numVoters, avgPoints, weeklyRank, result, _rawRow
-    const lines = csv.split('\n').filter(l => l.trim());
-    if (lines.length <= 1) return [];
+    // Use robust CSV parsing to avoid splitting on commas inside quoted fields.
+    const parsed = parseCSV(csv);
+    if (!parsed || parsed.length <= 1) return [];
 
-    // Detect header row
-    const headerParts = lines[0].split(',');
-    const hasHeader = headerParts.some(h => /song|title|week|points|vote/i.test(h));
+    const headerParts = parsed[0].map(h => (h || '').toString());
+    const hasHeader = headerParts.some(h => /song|title|week|points|vote|# of voters|avg/i.test(h));
 
-    const rows = hasHeader ? lines.slice(1) : lines.slice(1);
+    const rows = hasHeader ? parsed.slice(1) : parsed.slice(1);
     const result = [];
 
     // Legacy index map fallback
@@ -210,55 +318,103 @@ function parseVotesCSV(csv, editionConfig = {}) {
     };
 
     const colMap = (editionConfig && editionConfig.columnMap) ? editionConfig.columnMap : legacyMap;
- 
+
     const parseNum = v => {
         if (v === undefined || v === null || v === '') return 0;
-        const n = parseInt(String(v).replace(/[^0-9-]/g, ''), 10);
+        const s = String(v).trim().replace(/\u00A0/g, '').replace(/\s+/g, '');
+        // Support comma decimal in avgPoints elsewhere; here we strip non-digit for counts
+        const n = parseInt(s.replace(/[^0-9-]/g, ''), 10);
         return isNaN(n) ? 0 : n;
     };
- 
-    for (let i = 0; i < rows.length; i++) {
-        const line = rows[i];
-        const values = line.split(',');
- 
+
+    const parseFloatSafe = v => {
+        if (v === undefined || v === null || v === '') return 0;
+        const s = String(v).trim().replace(/\u00A0/g, '').replace(/\s+/g, '');
+        // Accept commas as decimal separators (e.g., "7,26")
+        const normalized = s.indexOf(',') > -1 && s.indexOf('.') === -1 ? s.replace(',', '.') : s;
+        const f = parseFloat(normalized.replace(/[^0-9.\-]/g, ''));
+        return isNaN(f) ? 0 : f;
+    };
+
+    // Helper to match header names loosely
+    const findHeaderIndex = (pattern) => {
+        const re = new RegExp(pattern, 'i');
+        for (let i = 0; i < headerParts.length; i++) {
+            if (re.test(headerParts[i])) return i;
+            // Also allow exact numeric header match for votes columns like "12","10"
+            if (String(headerParts[i]).trim() === String(pattern).trim()) return i;
+        }
+        return -1;
+    };
+
+    for (let r = 0; r < rows.length; r++) {
+        const values = rows[r] || [];
+
         const getByIndexOrName = (key) => {
-            const idx = colMap[key];
+            const idx = colMap && (colMap[key] !== undefined) ? colMap[key] : undefined;
             if (typeof idx === 'number' && values[idx] !== undefined) return values[idx];
             if (hasHeader) {
-                const headerIndex = headerParts.findIndex(h => new RegExp(key, 'i').test(h));
-                if (headerIndex >= 0) return values[headerIndex];
+                // Try a few sensible header matches based on common key names
+                const common = {
+                    songName: '(song|title)',
+                    song_title: '(song|title)',
+                    stageLabel: '(stage|week|group)',
+                    week: '(stage|week|group)',
+                    stage: '(stage|week|group)',
+                    pointsRaw: '(points|total|pts)',
+                    points: '(points|total|pts)',
+                    votes12: '(?:^12$|\\b12\\b|12)',
+                    votes10: '(?:^10$|\\b10\\b|10)',
+                    votes8: '(?:^8$|\\b8\\b|8)',
+                    votes7: '(?:^7$|\\b7\\b|7)',
+                    votes6: '(?:^6$|\\b6\\b|6)',
+                    votes5: '(?:^5$|\\b5\\b|5)',
+                    votes4: '(?:^4$|\\b4\\b|4)',
+                    votes3: '(?:^3$|\\b3\\b|3)',
+                    votes2: '(?:^2$|\\b2\\b|2)',
+                    votes1: '(?:^1$|\\b1\\b|1)',
+                    numVoters: '(# of voters|num of voters|voters|# voters|numvoters)',
+                    avgPoints: '(avg|average|avg points)',
+                    weeklyRank: '(weekly rank|weeklyrank|rank)',
+                    result: '(result|status)'
+                };
+                const pattern = common[key] || key;
+                const headerIndex = findHeaderIndex(pattern);
+                if (headerIndex >= 0 && values[headerIndex] !== undefined) return values[headerIndex];
             }
             return undefined;
         };
- 
-        const id = getByIndexOrName('id') ?? (i + 1).toString();
-        const songName = (getByIndexOrName('songName') || getByIndexOrName('song_title') || '').trim();
-        const stageLabel = (getByIndexOrName('stageLabel') || getByIndexOrName('week') || getByIndexOrName('stage') || '').trim();
-        const pointsRawStr = getByIndexOrName('pointsRaw') || getByIndexOrName('points') || '0';
- 
-        const votes12 = getByIndexOrName('votes12') || '0';
-        const votes10 = getByIndexOrName('votes10') || '0';
-        const votes8 = getByIndexOrName('votes8') || '0';
-        const votes7 = getByIndexOrName('votes7') || '0';
-        const votes6 = getByIndexOrName('votes6') || '0';
-        const votes5 = getByIndexOrName('votes5') || '0';
-        const votes4 = getByIndexOrName('votes4') || '0';
-        const votes3 = getByIndexOrName('votes3') || '0';
-        const votes2 = getByIndexOrName('votes2') || '0';
-        const votes1 = getByIndexOrName('votes1') || '0';
- 
-        const numVoters = getByIndexOrName('numVoters') || getByIndexOrName('voters') || '0';
-        const avgPoints = getByIndexOrName('avgPoints') || '0';
-        const weeklyRank = getByIndexOrName('weeklyRank') || '';
-        const resultFlag = (getByIndexOrName('result') || '').trim();
- 
+
+        const idVal = getByIndexOrName('id');
+        const id = idVal !== undefined ? String(idVal) : String(r + 1);
+
+        const songNameRaw = getByIndexOrName('songName') ?? getByIndexOrName('song_title') ?? getByIndexOrName('Song name') ?? '';
+        const songName = String(songNameRaw).trim();
+
+        const stageLabelRaw = getByIndexOrName('stageLabel') ?? getByIndexOrName('week') ?? getByIndexOrName('stage') ?? '';
+        const stageLabel = String(stageLabelRaw).trim();
+
+        const pointsRawStr = getByIndexOrName('pointsRaw') ?? getByIndexOrName('points') ?? '0';
+
+        const votes12 = getByIndexOrName('votes12') ?? '0';
+        const votes10 = getByIndexOrName('votes10') ?? '0';
+        const votes8 = getByIndexOrName('votes8') ?? '0';
+        const votes7 = getByIndexOrName('votes7') ?? '0';
+        const votes6 = getByIndexOrName('votes6') ?? '0';
+        const votes5 = getByIndexOrName('votes5') ?? '0';
+        const votes4 = getByIndexOrName('votes4') ?? '0';
+        const votes3 = getByIndexOrName('votes3') ?? '0';
+        const votes2 = getByIndexOrName('votes2') ?? '0';
+        const votes1 = getByIndexOrName('votes1') ?? '0';
+
+        const numVotersRaw = getByIndexOrName('numVoters') ?? getByIndexOrName('voters') ?? '0';
+        const avgPointsRaw = getByIndexOrName('avgPoints') ?? '0';
+        const weeklyRank = getByIndexOrName('weeklyRank') ?? '';
+        const resultFlag = (getByIndexOrName('result') || '').toString().trim();
+
         const pointsRaw = parseNum(pointsRawStr);
- 
+
         // Bonus handling (auto-detected).
-        // Detection order:
-        // 1) If the edition's columnMap defines `bonusPoints`, use that index.
-        // 2) Otherwise, if the CSV header contains a column with 'bonus' in its name, use that index.
-        // If found, parse the numeric value and include it in pointsFinal by default.
         let bonusPoints = 0;
         let bonusColumnIndex = undefined;
         if (typeof colMap.bonusPoints === 'number') {
@@ -270,14 +426,13 @@ function parseVotesCSV(csv, editionConfig = {}) {
         if (typeof bonusColumnIndex === 'number' && values[bonusColumnIndex] !== undefined) {
             bonusPoints = parseNum(values[bonusColumnIndex]);
         }
- 
-        // Default behavior: include bonusPoints in final points total.
+
         const pointsFinal = pointsRaw + (bonusPoints || 0);
 
         const canonical = {
             id: String(id),
             songName: songName,
-            stage: stageLabel || '',        // canonical stage/week label
+            stage: stageLabel || '',
             pointsRaw: pointsRaw,
             bonusPoints: bonusPoints,
             pointsFinal: pointsFinal,
@@ -291,8 +446,8 @@ function parseVotesCSV(csv, editionConfig = {}) {
             votes3: parseNum(votes3),
             votes2: parseNum(votes2),
             votes1: parseNum(votes1),
-            numVoters: parseNum(numVoters),
-            avgPoints: parseFloat(avgPoints) || 0,
+            numVoters: parseNum(numVotersRaw),
+            avgPoints: parseFloatSafe(avgPointsRaw),
             weeklyRank: weeklyRank,
             result: resultFlag,
             _rawRow: values
@@ -301,7 +456,7 @@ function parseVotesCSV(csv, editionConfig = {}) {
         result.push(canonical);
     }
 
-    console.log('Parsed and normalized votes data (preview):', result.slice(0,5));
+    console.log('Parsed and normalized votes data (preview):', result.slice(0, 5));
     return result;
 }
 
@@ -480,39 +635,77 @@ async function updateAudioPlayer(songUrl) {
  * - Otherwise infer order from the data, preferring "Bunk A..", "Showcase N", "Track Save", "2nd-chance", "Finals".
  */
 function getWeeksFromVotes(votesData, editionConfig = {}) {
-    // Simplified: derive unique stage labels from votesData and return them
-    // in a sensible order. Ignore editionConfig for now to avoid mismatches.
+    // Robust week/stage derivation with sanitization to avoid stray CSV artifacts
     if (!Array.isArray(votesData)) return [];
 
-    const stages = [...new Set(votesData.map(v => (v.stage ?? v.week ?? v.stageLabel ?? '').toString()).filter(Boolean))];
+    // Extract raw stage candidates from canonical fields
+    const raw = votesData
+        .map(v => (v.stage ?? v.week ?? v.stageLabel ?? ''))
+        .map(s => (s === undefined || s === null) ? '' : String(s))
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    // Cleaning routine to remove common CSV/field artifacts like trailing ]", [SSC7 fragments, extra quotes, etc.
+    const cleanLabel = (s) => {
+        if (!s) return '';
+        let t = String(s).trim();
+
+        // Remove surrounding quotes
+        t = t.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+
+        // Remove trailing bracket+quote patterns e.g. `]"`
+        t = t.replace(/\]\s*"*$/g, '').replace(/\]\s*'*$/g, '');
+
+        // Remove common [SSC7] or similar markers which belong on song titles not stage labels
+        t = t.replace(/\[SSC\d*\]/gi, '');
+        t = t.replace(/\[SSC\d*/gi, '');
+        t = t.replace(/\[.*?SSC\d*.*?\]/gi, '');
+
+        // Replace multiple spaces/tabs/newlines with single space
+        t = t.replace(/\s+/g, ' ').trim();
+
+        return t;
+    };
+
+    const stages = [...new Set(raw.map(cleanLabel).filter(Boolean))];
 
     // Separate numeric and non-numeric
-    const numeric = stages.filter(s => !isNaN(s)).map(Number).sort((a, b) => a - b).map(String);
+    const numeric = stages
+        .filter(s => !isNaN(s))
+        .map(Number)
+        .sort((a, b) => a - b)
+        .map(String);
+
     const alphas = stages.filter(s => isNaN(s));
 
     // Preferred ordering heuristics for alpha labels
-    const bunkRegex = /^bunk\s*([A-Za-z])$/i;
+    const bunkRegex = /^bunk\s*([A-Za-z0-9]+)$/i;
     const showcaseRegex = /showcase\s*(\d+)/i;
 
     const bunks = alphas.filter(s => bunkRegex.test(s)).sort((a, b) => {
-        const ma = a.match(bunkRegex)[1].toUpperCase();
-        const mb = b.match(bunkRegex)[1].toUpperCase();
+        const ma = (a.match(bunkRegex) || [null, a])[1].toString().toUpperCase();
+        const mb = (b.match(bunkRegex) || [null, b])[1].toString().toUpperCase();
         return ma.localeCompare(mb);
     });
 
     const showcases = alphas.filter(s => showcaseRegex.test(s)).sort((a, b) => {
-        const na = parseInt(a.match(showcaseRegex)[1], 10);
-        const nb = parseInt(b.match(showcaseRegex)[1], 10);
+        const ma = a.match(showcaseRegex);
+        const mb = b.match(showcaseRegex);
+        const na = ma ? parseInt(ma[1], 10) : 0;
+        const nb = mb ? parseInt(mb[1], 10) : 0;
         return na - nb;
     });
 
-    const trackSaves = alphas.filter(s => /track\s*save/i.test(s));
-    const secondChances = alphas.filter(s => /2nd|second\s*chance/i.test(s));
+    const trackSaves = alphas.filter(s => /track\s*save/i.test(s) || /tracksave/i.test(s));
+    const secondChances = alphas.filter(s => /2nd|second\s*chance|2nd-?chance/i.test(s));
     const finals = alphas.filter(s => /final/i.test(s));
 
-    const remaining = alphas.filter(s => ![...bunks, ...showcases, ...trackSaves, ...secondChances, ...finals].includes(s)).sort();
+    const prioritized = [...bunks, ...showcases, ...trackSaves, ...secondChances, ...finals];
 
-    return [...numeric, ...bunks, ...showcases, ...trackSaves, ...secondChances, ...finals, ...remaining];
+    // Remaining labels not matched above
+    const remaining = alphas.filter(s => !prioritized.includes(s)).sort();
+
+    return [...numeric, ...prioritized, ...remaining];
 }
 
 function initializeSelects(weeks) {
