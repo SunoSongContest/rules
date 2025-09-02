@@ -814,7 +814,7 @@ function getWeeksFromVotes(votesData, editionConfig = {}) {
     // If editionConfig provides an orderedStages array, use it to generate the alpha ordering.
     if (editionConfig && Array.isArray(editionConfig.orderedStages) && editionConfig.orderedStages.length > 0) {
         const obsSet = new Set(alphas.map(a => a.toLowerCase()));
-        const ordered = [];
+        let ordered = [];
  
         const normalizeForMatch = (s) => String(s || '').trim().toLowerCase();
  
@@ -844,6 +844,18 @@ function getWeeksFromVotes(votesData, editionConfig = {}) {
             }
         }
  
+        // If manifest provides explicit bunk groupLabels, ensure they appear in `ordered` in the manifest order.
+        const bunkEntry = editionConfig.orderedStages.find(e => e && e.type === 'bunk');
+        if (bunkEntry && Array.isArray(bunkEntry.groupLabels) && bunkEntry.groupLabels.length > 0) {
+            const manifestLabels = bunkEntry.groupLabels.map(l => String(l || '').trim()).filter(Boolean);
+            // Remove manifest-specified labels from current `ordered` to avoid duplicates,
+            // then prepend them in the exact manifest order (but only those actually present in data).
+            const normalize = normalizeForMatch;
+            const manifestIncluded = manifestLabels.filter(l => obsSet.has(normalize(l)));
+            const remainingOrdered = ordered.filter(x => !manifestIncluded.map(m => normalize(m)).includes(normalize(x)));
+            ordered = [...manifestIncluded, ...remainingOrdered];
+        }
+
         // Remaining alpha labels not covered by manifest ordering
         const remaining = alphas.filter(s => !ordered.map(x => normalizeForMatch(x)).includes(normalizeForMatch(s))).sort();
  
