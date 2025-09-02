@@ -13,12 +13,15 @@ function updateChart(songData) {
         parseInt(songData.votes1)
     ];
 
-    if (chart) {
-        chart.destroy();
+    // Use a dedicated chart instance for the single-song vote distribution so it doesn't
+    // interfere with the weekly summary chart instance.
+    if (window.songChart) {
+        try { window.songChart.destroy(); } catch (e) { /* ignore destroy errors */ }
+        window.songChart = null;
     }
-
+    
     const ctx = document.getElementById('votesChart').getContext('2d');
-    chart = new Chart(ctx, {
+    window.songChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: [12, 10, 8, 7, 6, 5, 4, 3, 2, 1],
@@ -133,46 +136,45 @@ function createAudioVisualizer(audioElement) {
 async function updateVisualization() {
     const songSelect = document.getElementById('songSelect');
     const weekSelect = document.getElementById('weekSelect');
-    const selectedSong = songSelect.value;
-    const selectedWeek = weekSelect.value;
+    const selectedSong = songSelect?.value;
+    const selectedWeek = weekSelect?.value;
     const statsContainer = document.querySelector('.stats-container');
 
     // Hide stats if no selections
     if (!selectedSong || !selectedWeek) {
-        statsContainer.style.display = 'none';
+        if (statsContainer) statsContainer.style.display = 'none';
         return;
     }
 
     // Show stats container
-    statsContainer.style.display = 'grid';
+    if (statsContainer) statsContainer.style.display = 'grid';
 
     // Clear any existing images
     const existingImg = document.querySelector('.song-group img');
-    if (existingImg) {
-        existingImg.remove();
+    if (existingImg) existingImg.remove();
+
+    // Find song by name and stage/week (support both legacy 'week' and new 'stage' field)
+    const songData = window.votes.find(v =>
+        v.songName === selectedSong &&
+        (String(v.stage) === String(selectedWeek) || String(v.week) === String(selectedWeek))
+    );
+    
+    const submissionData = (typeof window.findSubmissionBySongName === 'function')
+        ? window.findSubmissionBySongName(songData && songData.songName)
+        : ((window.submissions || []).find(s => s.songTitle === (songData && songData.songName)) || undefined);
+    
+    if (!songData || !submissionData) {
+        console.warn('Song or submission data not found for selection:', selectedSong, selectedWeek);
+        if (statsContainer) statsContainer.style.display = 'none';
+        return;
     }
 
-    const songData = votes.find(v => v.songName === selectedSong && v.week === selectedWeek);
-    const submissionData = submissions.find(s => s.songTitle === songData.songName);
-    
     // Get song ID from URL
     const songId = getSongIdFromUrl(submissionData.songUrl);
-    
-    // Fetch additional song info including image
-    if (songId) {
-        const songInfo = await getSongInfo(songId);
-        if (songInfo) {
-            const imgElement = document.createElement('img');
-            imgElement.src = songInfo.imageUrl;
-            imgElement.style.width = '100%'; // Makes image full width of container
-            imgElement.style.height = 'auto';
-            imgElement.style.borderRadius = '8px';
-            imgElement.style.marginBottom = '15px';
-            imgElement.style.objectFit = 'cover';
-            
-            document.querySelector('.song-group').insertBefore(imgElement, document.querySelector('.song-card'));
-        }
-    }
+
+    // Image insertion is handled centrally by updateAudioPlayer() in data-handlers.js
+    // to avoid duplicate cover art. visualization.updateVisualization only manages the chart,
+    // audio player and stats; it relies on updateAudioPlayer to manage the cover image.
 
     // Create or update audio player
     let audioPlayer = document.getElementById('songPlayer');
@@ -180,9 +182,9 @@ async function updateVisualization() {
         audioPlayer = createStyledAudioPlayer();
         document.querySelector('.song-group').appendChild(audioPlayer);
     }
-    
+
     // Set audio source
-    audioPlayer.src = `https://cdn1.suno.ai/${songId}.mp3`;
+    if (songId) audioPlayer.src = `https://cdn1.suno.ai/${songId}.mp3`;
 
     // Create audio visualizer if it doesn't exist
     if (!document.querySelector('.visualizer')) {
@@ -191,20 +193,37 @@ async function updateVisualization() {
 
     // Update audio player event listener
     audioPlayer.addEventListener('play', () => {
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume();
-        }
+        if (audioContext && audioContext.state === 'suspended') audioContext.resume();
     });
 
-    // Update all stats
+    // Update all stats (use canonical fields)
     document.getElementById('SongName').innerHTML = `<a href="${submissionData.songUrl}" target="_blank">${songData.songName}</a>`;
-    document.getElementById('sunoArtist').textContent = submissionData.sunoUsername;
-    document.getElementById('averageScore').textContent = songData.avgPoints;
-    document.getElementById('totalVoters').textContent = songData.numVoters;
-    document.getElementById('totalPoints').textContent = songData.points;
-    document.getElementById('weeklyRank').textContent = songData.weeklyRank;
+    document.getElementById('sunoArtist').textContent = submissionData.sunoUsername || '-';
+    document.getElementById('averageScore').textContent = songData.avgPoints ?? songData.avg_points ?? '-';
+    document.getElementById('totalVoters').textContent = songData.numVoters ?? songData.num_voters ?? '-';
+    document.getElementById('totalPoints').textContent = songData.pointsFinal ?? songData.points ?? '-';
+    document.getElementById('weeklyRank').textContent = songData.weeklyRank ?? songData.weekly_rank ?? '-';
+    
+    // Bonus points: show separately when available
+    try {
+        const bonus = (songData.bonusPoints ?? songData.bonus_points ?? 0);
+        const bonusCard = document.getElementById('bonusPointsCard');
+        const bonusEl = document.getElementById('bonusPoints');
+        if (bonusCard && bonusEl) {
+            if (Number(bonus) && Number(bonus) !== 0) {
+                bonusEl.textContent = String(bonus);
+                bonusCard.style.display = ''; // default / inherit from CSS grid
+            } else {
+                bonusEl.textContent = '-';
+                bonusCard.style.display = 'none';
+            }
+        }
+    } catch (e) {
+        // defensive: ignore if DOM elements missing
+        console.warn('Failed to render bonus points', e);
+    }
 
-    // Update chart with vote distribution
+    // Update chart with vote distribution (chart expects votes12..votes1)
     updateChart(songData);
 }
 function getSongIdFromUrl(url) {
@@ -314,37 +333,70 @@ async function getSongInfo(songId) {
 }
 function updateWeeklySummary() {
     const weekSelect = document.getElementById('summaryWeekSelect');
-    const selectedWeek = weekSelect.value;
+    const selectedWeek = weekSelect ? weekSelect.value : '';
     
     // Hide podium if no week selected
     const podiumSection = document.querySelector('.top-songs-podium');
-    podiumSection.style.display = selectedWeek ? 'block' : 'none';
+    if (podiumSection) podiumSection.style.display = selectedWeek ? 'block' : 'none';
     
     if (!selectedWeek) return;
     
-    const weekVotes = votes.filter(v => v.week === selectedWeek);
+    // Prefer canonical `stage` field. Support legacy `week` fallback.
+    const weekVotes = (window.votes || []).filter(v => {
+        const stageVal = (v.stage ?? v.week ?? '').toString();
+        return String(stageVal) === String(selectedWeek);
+    });
     
     // Destroy existing chart before creating new one
-    if (window.chart) {
-        window.chart.destroy();
+    if (window.weekChart) {
+        try { window.weekChart.destroy(); } catch (e) { /* ignore */ }
+        window.weekChart = null;
     }
     
-    updatePodium(weekVotes);
+    // Sort votes once (do this before any use of `sortedVotes`)
+    const sortedVotes = [...weekVotes].sort((a, b) => {
+        const pa = Number(a.pointsFinal ?? a.points ?? 0);
+        const pb = Number(b.pointsFinal ?? b.points ?? 0);
+        return pb - pa;
+    });
+    
+    // Single call to update podium with the sorted list
+    updatePodium(sortedVotes);
     
     // Reset chart size before updating
     const chartCanvas = document.getElementById('weekSummaryChart');
-    chartCanvas.style.height = '1200px';
+    if (chartCanvas) {
+        // Clear any explicit height so Chart.js can recompute natural layout.
+        chartCanvas.style.height = '';
+
+        // Ensure the parent chart container becomes scrollable for very tall charts so the page doesn't
+        // grow unbounded while still allowing the chart to render at a readable height.
+        const chartContainerEl = chartCanvas.parentNode;
+        if (chartContainerEl && chartContainerEl.classList && chartContainerEl.classList.contains('chart-container')) {
+            chartContainerEl.style.overflowY = 'auto';
+            chartContainerEl.style.maxHeight = '80vh';
+        }
+
+        // Compute chart height based on number of bars to avoid excessive blank space.
+        // Approx 40px per row + padding; clamp between 400px and 5000px.
+        const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
+        const computed = Math.max(400, Math.min(40 * itemCount + 200, 5000));
+        chartCanvas.style.height = `${computed}px`;
+    }
     
-    const sortedVotes = weekVotes.sort((a, b) => parseInt(b.points) - parseInt(a.points));
+    const ctx = chartCanvas ? chartCanvas.getContext('2d') : null;
+    if (!ctx) {
+        console.error('updateWeeklySummary: canvas/context not available');
+        return;
+    }
     
-    const ctx = document.getElementById('weekSummaryChart').getContext('2d');
-    window.chart = new Chart(ctx, {
+    window.weekChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: sortedVotes.map(v => v.songName),
             datasets: [{
                 label: 'Total Points',
-                data: sortedVotes.map(v => parseInt(v.points)),
+                data: sortedVotes.map(v => Number(v.pointsFinal ?? v.points ?? 0)),
                 backgroundColor: 'rgba(90, 30, 90, 0.6)',
                 borderColor: 'rgba(90, 30, 90, 1)',
                 borderWidth: 1

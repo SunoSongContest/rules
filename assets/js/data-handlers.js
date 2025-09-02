@@ -61,13 +61,22 @@ function handleEditionChange(event) {
 }
 async function loadEditionData(event) {
     const edition = event.target.value;
-    if(!edition) return;
-    
-    const files = window.CSV_MANIFEST.getEditionFiles(edition);
-    if (!files) return;
-    
+    if (!edition) return;
+
+    const editionConfig = window.CSV_MANIFEST.getEditionConfig(parseInt(edition));
+    if (!editionConfig) {
+        console.error(`No config found for edition: ${edition}`);
+        return;
+    }
+
+    const files = editionConfig.files;
+    if (!files) {
+        console.error('No files configured for edition', edition);
+        return;
+    }
+
     const csvPath = `${window.location.origin}/rules/assets/csv`;
-    
+
     try {
         const [submissionsResponse, votesResponse] = await Promise.all([
             fetch(`${csvPath}/${files.submissions}`),
@@ -76,180 +85,568 @@ async function loadEditionData(event) {
 
         const submissionsText = await submissionsResponse.text();
         const votesText = await votesResponse.text();
-        
-        submissions = parseSubmissionsCSV(submissionsText);
-        votes = parseVotesCSV(votesText);
-        
-        // Get weeks dynamically from votes data
-        const weeks = getWeeksFromVotes(votes);
-        
+
+        // Parse submissions using existing parser
+        window.submissions = parseSubmissionsCSV(submissionsText);
+
+        // Parse and normalize votes according to edition config
+        const rawVotes = parseVotesCSV(votesText, editionConfig);
+        window.rawVotes = rawVotes;
+
+        // Provide normalized canonical votes for the rest of the app while preserving backwards compatibility
+        // canonical fields: id, songName, stage, pointsRaw, bonusPoints, pointsFinal, numVoters, avgPoints, weeklyRank, result, votes12..votes1
+        window.votes = rawVotes; // keep old API; objects are canonical
+// Normalize legacy/compat fields so UI filters work reliably.
+// Ensure every vote has both `stage` and `pointsFinal` populated.
+if (window.votes && Array.isArray(window.votes)) {
+    // Determine if this edition's manifest indicates points already include bonus
+    const editionPointsIncludeBonus = Boolean( (typeof window.CSV_MANIFEST?.getEditionConfig === 'function') && (() => {
+        try {
+            // Attempt to infer edition from loaded files path or leave false if unavailable.
+            // This is best-effort; loadEditionData normally passes editionConfig, but this fallback is defensive.
+            return false;
+        } catch (e) { return false; }
+    })() );
+ 
+    window.votes.forEach(v => {
+        // stage fallback: stage <- week <- stageLabel
+        v.stage = (v.stage || v.week || v.stageLabel || '').toString();
+ 
+        // pointsFinal fallback: prefer existing pointsFinal, otherwise use points + bonusPoints (or numeric points)
+        const parseNum = x => {
+            if (x === undefined || x === null || x === '') return 0;
+            const n = parseInt(String(x).replace(/[^0-9-]/g, ''), 10);
+            return isNaN(n) ? 0 : n;
+        };
+ 
+        if (v.pointsFinal === undefined || v.pointsFinal === null || v.pointsFinal === '') {
+            const rawPoints = parseNum(v.points);
+            const bonus = parseNum(v.bonusPoints);
+            // If the manifest/edition indicates points already include bonus, do not add it again.
+            // The more specific parsing stage (parseVotesCSV) will set editionConfig.pointsRawIncludesBonus when known;
+            // this normalization is defensive — prefer rawPoints when points already include bonus.
+            const pointsRawIncludesBonus = Boolean(v._editionPointsIncludeBonus || false);
+            v.pointsFinal = pointsRawIncludesBonus ? rawPoints : (rawPoints + bonus);
+        }
+ 
+        // ensure points also exists as numeric string for legacy code paths
+        if (v.points === undefined || v.points === null) {
+            v.points = String(v.pointsFinal || 0);
+        }
+    });
+}
+
+        // Recompute pointsFinal deterministically according to manifest flag to avoid any double-counting.
+        // Some editions (SSC7) indicate the points column already includes bonus; the manifest flag
+        // `pointsRawIncludesBonus` controls this behavior.
+        const pointsRawIncludesBonus = Boolean(editionConfig && editionConfig.pointsRawIncludesBonus);
+        const toNum = (x) => {
+            if (x === undefined || x === null || x === '') return 0;
+            const s = String(x).trim().replace(/\u00A0/g, '').replace(/[^0-9.\-]/g, '');
+            const n = Number(s);
+            return isNaN(n) ? 0 : n;
+        };
+        if (Array.isArray(window.votes)) {
+            window.votes.forEach(v => {
+                // preserve existing raw fields where available
+                const rawPoints = toNum(v.pointsRaw ?? v.points ?? v.pointsFinal ?? 0);
+                const bonus = toNum(v.bonusPoints ?? 0);
+                if (pointsRawIncludesBonus) {
+                    v.pointsFinal = rawPoints;
+                    // if the CSV already included bonus in points, keep bonusPoints as parsed (may be 0 or present)
+                    v.bonusPoints = bonus;
+                } else {
+                    v.bonusPoints = bonus;
+                    v.pointsFinal = rawPoints + bonus;
+                }
+                // keep legacy `points` string in sync
+                v.points = String(v.pointsFinal || 0);
+            });
+        }
+ 
+        // Determine weeks/stages for UI
+        const weeks = getWeeksFromVotes(window.votes, editionConfig);
+
         initializeSelects(weeks);
         initializeMenu();
-        
-        // Reset views
-        document.getElementById('songSelect').value = '';
-        document.getElementById('weekSelect').value = '';
-        document.getElementById('summaryWeekSelect').value = '';
-        
+
+        // Reset views and selectors
+        const songSelectEl = document.getElementById('songSelect');
+        const weekSelectEl = document.getElementById('weekSelect');
+        const summaryWeekSelectEl = document.getElementById('summaryWeekSelect');
+
+        if (songSelectEl) songSelectEl.value = '';
+        if (weekSelectEl) weekSelectEl.value = '';
+        if (summaryWeekSelectEl) summaryWeekSelectEl.value = '';
+
         const statsContainer = document.querySelector('.stats-container');
-        statsContainer.style.display = 'none';
-        
-        if(chart) {
-            chart.destroy();
+        if (statsContainer) statsContainer.style.display = 'none';
+
+        if (window.weekChart) {
+            window.weekChart.destroy();
+            window.weekChart = null;
         }
+
+        console.log(`Loaded and normalized edition SSC${edition}`, {
+            totalSongs: window.votes.length,
+            weeks
+        });
     } catch (error) {
         console.error('Error loading edition data:', error);
     }
 }
+function parseCSV(text) {
+    // Minimal, robust CSV parser that handles:
+    // - quoted fields (")
+    // - double-quoted quotes ("")
+    // - CRLF or LF line endings
+    // Returns array of rows, each row is array of column values (strings, unquoted).
+    const rows = [];
+    if (text === undefined || text === null) return rows;
+    const len = text.length;
+    let i = 0;
+    let cur = '';
+    let row = [];
+    let inQuotes = false;
+
+    while (i < len) {
+        const ch = text[i];
+
+        if (inQuotes) {
+            if (ch === '"') {
+                // Lookahead for double quote escape
+                if (i + 1 < len && text[i + 1] === '"') {
+                    cur += '"';
+                    i += 2;
+                    continue;
+                } else {
+                    inQuotes = false;
+                    i++;
+                    continue;
+                }
+            } else {
+                cur += ch;
+                i++;
+                continue;
+            }
+        }
+
+        // Not in quotes
+        if (ch === '"') {
+            inQuotes = true;
+            i++;
+            continue;
+        }
+
+        if (ch === ',') {
+            row.push(cur);
+            cur = '';
+            i++;
+            continue;
+        }
+
+        // Handle CRLF or LF line breaks
+        if (ch === '\r') {
+            // If CRLF, skip next LF
+            if (i + 1 < len && text[i + 1] === '\n') i++;
+            row.push(cur);
+            rows.push(row);
+            row = [];
+            cur = '';
+            i++;
+            continue;
+        }
+
+        if (ch === '\n') {
+            row.push(cur);
+            rows.push(row);
+            row = [];
+            cur = '';
+            i++;
+            continue;
+        }
+
+        cur += ch;
+        i++;
+    }
+
+    // Push any remaining value
+    if (inQuotes) {
+        // unterminated quote - still push what we have
+        row.push(cur);
+        rows.push(row);
+    } else {
+        if (cur !== '' || row.length > 0) {
+            row.push(cur);
+            rows.push(row);
+        }
+    }
+
+    return rows;
+}
+
 function parseSubmissionsCSV(csv) {
-    const lines = csv.split('\n');
-    const result = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        
-        const values = lines[i].split(',');
-        result.push({
-            songTitle: values[4],
-            sunoUsername: values[3],
-            songUrl: values[5]
-        });
-    }
-    
-    return result;
-}
-
-function parseVotesCSV(csv) {
-    const lines = csv.split('\n');
+    // Use the robust CSV parser to correctly handle quoted fields and commas inside fields.
+    const rows = parseCSV(csv);
     const result = [];
 
-    for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        
-        const values = lines[i].split(',');
-        result.push({
-            id: values[0],
-            songName: values[1],
-            week: values[2],
-            points: values[3],
-            votes12: values[4],
-            votes10: values[5],
-            votes8: values[6],
-            votes7: values[7],
-            votes6: values[8],
-            votes5: values[9],
-            votes4: values[10],
-            votes3: values[11],
-            votes2: values[12],
-            votes1: values[13],
-            numVoters: values[14],
-            avgPoints: values[15],
-            weeklyRank: values[16],
-            result: values[17]  // Add this line
-        });
-    }
+    if (!rows || rows.length <= 1) return result;
 
-    return result;
-}
+    // Header is rows[0]; data starts from rows[1]
+    for (let i = 1; i < rows.length; i++) {
+        const values = rows[i];
+        if (!values || values.length === 0) continue;
+        // Defensive: trim all values
+        for (let j = 0; j < values.length; j++) {
+            if (typeof values[j] === 'string') values[j] = values[j].trim();
+        }
 
-function getWeeksFromVotes(votesData) {
-    // Get unique week values
-    const weeks = new Set(votesData.map(vote => vote.week));
-    console.log('Detected weeks:', [...weeks]);
-}    
-function parseVotesCSV(csv) {
-    const lines = csv.split('\n');
-    const result = [];
+        // Determine column indices using the header row when available (handles SSC6 vs SSC7 differences)
+        // Fallback to sensible index guesses when header names aren't present.
+        const headerRow = rows[0] || [];
+        const headerLower = headerRow.map(h => (h || '').toString().toLowerCase());
+        let songTitleIndex = headerLower.findIndex(h => /(^|\b)song\b.*\btitle\b|^song\s*title$|^title$/i.test(h));
+        if (songTitleIndex === -1) {
+            // try looser match for "song title" or "song"
+            songTitleIndex = headerLower.findIndex(h => /\bsong\b/i.test(h));
+        }
+        let sunoIndex = headerLower.findIndex(h => /suno/i.test(h) || /suno username/i.test(h));
+        // If header detection failed, fall back to common index patterns:
+        if (songTitleIndex === -1 && sunoIndex === -1) {
+            // SSC6 style: index 3 = Suno username, 4 = Song title
+            // SSC7 style: index 3 = Song title, 4 = Suno username
+            // Choose by inspecting which field looks like a URL in index 5 etc.
+            songTitleIndex = (values[4] && values[4].toString().trim() !== '') ? 4 : 3;
+            sunoIndex = (songTitleIndex === 4) ? 3 : 4;
+        } else {
+            if (songTitleIndex === -1) songTitleIndex = (sunoIndex === 4 ? 3 : 4);
+            if (sunoIndex === -1) sunoIndex = (songTitleIndex === 4 ? 3 : 4);
+        }
+        const songTitle = (values[songTitleIndex] || '').toString().trim();
+        const sunoUsername = (values[sunoIndex] || '').toString().trim();
+        const songUrl = (values[5] || values[6] || '').toString().trim();
 
-    for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
-        
-        const values = lines[i].split(',');
-        result.push({
-            id: values[0],
-            songName: values[1],
-            week: values[2],         // Week is in the third column
-            points: values[3],
-            votes12: values[4],
-            votes10: values[5],
-            votes8: values[6],
-            votes7: values[7],
-            votes6: values[8],
-            votes5: values[9],
-            votes4: values[10],
-            votes3: values[11],
-            votes2: values[12],
-            votes1: values[13],
-            numVoters: values[14],
-            avgPoints: values[15],
-            weeklyRank: values[16],
-            result: values[17]
-        });
-    }
-    console.log('Parsed votes data:', result);
-    return result;
-}
-
-async function loadEditionData(event) {
-    const edition = event.target.value;
-    if(!edition) return;
-    
-    const files = window.CSV_MANIFEST.getEditionFiles(edition);
-    if (!files) return;
-    
-    const csvPath = `${window.location.origin}/rules/assets/csv`;
-    
-    try {
-        console.log('Loading files:', files);
-        const [submissionsResponse, votesResponse] = await Promise.all([
-            fetch(`${csvPath}/${files.submissions}`),
-            fetch(`${csvPath}/${files.votes}`)
-        ]);
-
-        const submissionsText = await submissionsResponse.text();
-        const votesText = await votesResponse.text();
-        
-        // Parse data and store globally
-        window.submissions = parseSubmissionsCSV(submissionsText);
-        window.votes = parseVotesCSV(votesText);
-        
-        console.log('Loaded votes:', window.votes);
-        
-        // Get unique weeks
-        const uniqueWeeks = [...new Set(window.votes.map(v => v.week))].sort((a, b) => {
-            if (!isNaN(a) && !isNaN(b)) return parseInt(a) - parseInt(b);
-            if (!isNaN(a)) return -1;
-            if (!isNaN(b)) return 1;
-            if (a === '2nd-chance') return -1;
-            if (b === '2nd-chance') return 1;
-            return 0;
-        });
-        
-        console.log('Unique weeks found:', uniqueWeeks);
-        
-        // Populate week selectors
-        const weekSelect = document.getElementById('weekSelect');
-        const summaryWeekSelect = document.getElementById('summaryWeekSelect');
-        
-        [weekSelect, summaryWeekSelect].forEach(select => {
-            select.innerHTML = '<option value="">Select Week</option>';
-            uniqueWeeks.forEach(week => {
-                const option = document.createElement('option');
-                option.value = week;
-                option.textContent = isNaN(week) ? week : `Week ${week}`;
-                select.appendChild(option);
+        // Only include if we have a song title
+        if (songTitle) {
+            result.push({
+                songTitle,
+                sunoUsername,
+                songUrl
             });
-        });
-        
-        // Initialize week listeners
-        initializeWeekListeners();
-        
-        console.log('Week selectors populated and listeners attached');
-        
-    } catch (error) {
-        console.error('Error loading edition data:', error);
+        }
     }
+
+    return result;
 }
+
+/* Helper: normalize song titles for matching (strip trailing bracketed/parenthesized suffixes like "[SSC7, USA]" or "(SSC7 USA)") */
+function normalizeSongTitle(title) {
+    if (!title && title !== 0) return '';
+    // Coerce and trim
+    let t = String(title).trim();
+
+    // Normalize smart quotes/dashes to ASCII equivalents
+    t = t.replace(/[“”„‟"]/g, '"').replace(/[‘’‛']/g, "'").replace(/[\u2013\u2014]/g, '-');
+
+    // Remove only trailing bracketed or parenthesized suffixes (safer than removing from first '[' or '(')
+    // e.g. "What Am I Doing? [SSC7, United States]" -> "What Am I Doing?"
+    //       "Strange Creek (SSC7 USA)" -> "Strange Creek"
+    t = t.replace(/\s*\[[^\]]*\]\s*$/g, '');
+    t = t.replace(/\s*\([^\)]*\)\s*$/g, '');
+
+    // Remove surrounding quotes/apostrophes
+    t = t.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+
+    // Unicode normalize and strip diacritics
+    try {
+        t = t.normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
+    } catch (e) {
+        // ignore if normalize not supported
+    }
+
+    // Remove punctuation except letters, numbers, spaces, apostrophes and hyphens
+    // This keeps contractions and hyphenated words but strips stray commas/colons/brackets/etc.
+    t = t.replace(/[^\p{L}\p{N}\s'-]+/gu, '');
+
+    // Collapse repeated whitespace and lowercase for robust comparison
+    t = t.replace(/\s+/g, ' ').trim().toLowerCase();
+
+    return t;
+}
+
+/* Helper: compute small edit distance (Levenshtein) for fuzzy fallback */
+function levenshtein(a, b) {
+    const al = a.length, bl = b.length;
+    if (al === 0) return bl;
+    if (bl === 0) return al;
+    const matrix = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+    for (let i = 0; i <= al; i++) matrix[i][0] = i;
+    for (let j = 0; j <= bl; j++) matrix[0][j] = j;
+    for (let i = 1; i <= al; i++) {
+        for (let j = 1; j <= bl; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1,      // deletion
+                matrix[i][j - 1] + 1,      // insertion
+                matrix[i - 1][j - 1] + cost // substitution
+            );
+        }
+    }
+    return matrix[al][bl];
+}
+
+/* Helper: find a submission by song name using normalized comparison with fallbacks:
+   1) exact normalized equality
+   2) normalized substring (one contains the other)
+   3) fuzzy Levenshtein distance (small threshold)
+*/
+function findSubmissionBySongName(songName) {
+    if (!Array.isArray(window.submissions) || !songName) return undefined;
+    const norm = normalizeSongTitle(songName);
+
+    // Exact match first
+    let match = window.submissions.find(s => normalizeSongTitle(s.songTitle) === norm);
+    if (match) return match;
+
+    // Substring match (handle small formatting differences)
+    match = window.submissions.find(s => {
+        const sn = normalizeSongTitle(s.songTitle);
+        return sn.includes(norm) || norm.includes(sn);
+    });
+    if (match) return match;
+
+    // Fuzzy fallback: allow small edit distance relative to length
+    let best = null;
+    let bestScore = Infinity;
+    for (const s of window.submissions) {
+        const sn = normalizeSongTitle(s.songTitle);
+        if (!sn) continue;
+        const dist = levenshtein(norm, sn);
+        const rel = dist / Math.max(1, Math.max(norm.length, sn.length));
+        if (rel < 0.18 && dist < bestScore) { // threshold: ~18% difference or small absolute diff
+            best = s;
+            bestScore = dist;
+        }
+    }
+    if (best) return best;
+
+    return undefined;
+}
+
+// Expose helper globally so other modules can use it
+window.findSubmissionBySongName = findSubmissionBySongName;
+ 
+/* Helper: normalize stage labels (groups/weeks) for matching/options.
+   Strips bracketed/parenthesized fragments, collapses whitespace, lowercases. */
+function normalizeStageLabel(s) {
+    if (!s && s !== 0) return '';
+    let t = String(s || '').trim();
+    t = t.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+    t = t.replace(/\s*\[[^\]]*\]\s*$/g, '');
+    t = t.replace(/\s*\([^\)]*\)\s*$/g, '');
+    t = t.replace(/\s+/g, ' ').trim().toLowerCase();
+    return t;
+}
+ 
+function parseVotesCSV(csv, editionConfig = {}) {
+    // Use robust CSV parsing to avoid splitting on commas inside quoted fields.
+    const parsed = parseCSV(csv);
+    if (!parsed || parsed.length <= 1) return [];
+
+    const headerParts = parsed[0].map(h => (h || '').toString());
+    const hasHeader = headerParts.some(h => /song|title|week|points|vote|# of voters|avg/i.test(h));
+
+    const rows = hasHeader ? parsed.slice(1) : parsed.slice(1);
+    const result = [];
+
+    // Legacy index map fallback
+    const legacyMap = {
+        id: 0,
+        songName: 1,
+        week: 2,
+        points: 3,
+        votes12: 4,
+        votes10: 5,
+        votes8: 6,
+        votes7: 7,
+        votes6: 8,
+        votes5: 9,
+        votes4: 10,
+        votes3: 11,
+        votes2: 12,
+        votes1: 13,
+        numVoters: 14,
+        avgPoints: 15,
+        weeklyRank: 16,
+        result: 17
+    };
+
+    const colMap = (editionConfig && editionConfig.columnMap) ? editionConfig.columnMap : legacyMap;
+
+    const parseNum = v => {
+        if (v === undefined || v === null || v === '') return 0;
+        const s = String(v).trim().replace(/\u00A0/g, '').replace(/\s+/g, '');
+        // Support comma decimal in avgPoints elsewhere; here we strip non-digit for counts
+        const n = parseInt(s.replace(/[^0-9-]/g, ''), 10);
+        return isNaN(n) ? 0 : n;
+    };
+
+    const parseFloatSafe = v => {
+        if (v === undefined || v === null || v === '') return 0;
+        const s = String(v).trim().replace(/\u00A0/g, '').replace(/\s+/g, '');
+        // Accept commas as decimal separators (e.g., "7,26")
+        const normalized = s.indexOf(',') > -1 && s.indexOf('.') === -1 ? s.replace(',', '.') : s;
+        const f = parseFloat(normalized.replace(/[^0-9.\-]/g, ''));
+        return isNaN(f) ? 0 : f;
+    };
+
+    // Helper to match header names loosely
+    const findHeaderIndex = (pattern) => {
+        const re = new RegExp(pattern, 'i');
+        for (let i = 0; i < headerParts.length; i++) {
+            if (re.test(headerParts[i])) return i;
+            // Also allow exact numeric header match for votes columns like "12","10"
+            if (String(headerParts[i]).trim() === String(pattern).trim()) return i;
+        }
+        return -1;
+    };
+
+    for (let r = 0; r < rows.length; r++) {
+        const values = rows[r] || [];
+
+        const getByIndexOrName = (key) => {
+            const idx = colMap && (colMap[key] !== undefined) ? colMap[key] : undefined;
+            if (typeof idx === 'number' && values[idx] !== undefined) return values[idx];
+            if (hasHeader) {
+                // Try a few sensible header matches based on common key names
+                const common = {
+                    songName: '(song|title)',
+                    song_title: '(song|title)',
+                    stageLabel: '(stage|week|group)',
+                    week: '(stage|week|group)',
+                    stage: '(stage|week|group)',
+                    pointsRaw: '(points|total|pts)',
+                    points: '(points|total|pts)',
+                    votes12: '(?:^12$|\\b12\\b|12)',
+                    votes10: '(?:^10$|\\b10\\b|10)',
+                    votes8: '(?:^8$|\\b8\\b|8)',
+                    votes7: '(?:^7$|\\b7\\b|7)',
+                    votes6: '(?:^6$|\\b6\\b|6)',
+                    votes5: '(?:^5$|\\b5\\b|5)',
+                    votes4: '(?:^4$|\\b4\\b|4)',
+                    votes3: '(?:^3$|\\b3\\b|3)',
+                    votes2: '(?:^2$|\\b2\\b|2)',
+                    votes1: '(?:^1$|\\b1\\b|1)',
+                    numVoters: '(# of voters|num of voters|voters|# voters|numvoters)',
+                    avgPoints: '(avg|average|avg points)',
+                    weeklyRank: '(weekly rank|weeklyrank|rank)',
+                    result: '(result|status)'
+                };
+                const pattern = common[key] || key;
+                const headerIndex = findHeaderIndex(pattern);
+                if (headerIndex >= 0 && values[headerIndex] !== undefined) return values[headerIndex];
+            }
+            return undefined;
+        };
+
+        const idVal = getByIndexOrName('id');
+        const id = idVal !== undefined ? String(idVal) : String(r + 1);
+
+        const songNameRaw = getByIndexOrName('songName') ?? getByIndexOrName('song_title') ?? getByIndexOrName('Song name') ?? '';
+        const songName = String(songNameRaw).trim();
+
+        const stageLabelRaw = getByIndexOrName('stageLabel') ?? getByIndexOrName('week') ?? getByIndexOrName('stage') ?? '';
+        const stageLabel = String(stageLabelRaw).trim();
+
+        const pointsRawStr = getByIndexOrName('pointsRaw') ?? getByIndexOrName('points') ?? '0';
+
+        const votes12 = getByIndexOrName('votes12') ?? '0';
+        const votes10 = getByIndexOrName('votes10') ?? '0';
+        const votes8 = getByIndexOrName('votes8') ?? '0';
+        const votes7 = getByIndexOrName('votes7') ?? '0';
+        const votes6 = getByIndexOrName('votes6') ?? '0';
+        const votes5 = getByIndexOrName('votes5') ?? '0';
+        const votes4 = getByIndexOrName('votes4') ?? '0';
+        const votes3 = getByIndexOrName('votes3') ?? '0';
+        const votes2 = getByIndexOrName('votes2') ?? '0';
+        const votes1 = getByIndexOrName('votes1') ?? '0';
+
+        const numVotersRaw = getByIndexOrName('numVoters') ?? getByIndexOrName('voters') ?? '0';
+        const avgPointsRaw = getByIndexOrName('avgPoints') ?? '0';
+        const weeklyRank = getByIndexOrName('weeklyRank') ?? '';
+        const resultFlag = (getByIndexOrName('result') || '').toString().trim();
+
+        // Determine displayed points from CSV and parse bonus column.
+        // The manifest flag `pointsRawIncludesBonus` indicates whether the CSV "points"
+        // column already includes bonus points. When true we should display that value
+        // as the total and not add the bonus again.
+        const displayedCandidate = parseNum(getByIndexOrName('points') ?? getByIndexOrName('pointsRaw') ?? '0');
+ 
+        // Bonus handling (auto-detected).
+        let bonusPoints = 0;
+        let bonusColumnIndex = undefined;
+        if (typeof colMap.bonusPoints === 'number') {
+            bonusColumnIndex = colMap.bonusPoints;
+        } else if (hasHeader) {
+            const bonusIdx = headerParts.findIndex(h => /bonus/i.test(h));
+            if (bonusIdx >= 0) bonusColumnIndex = bonusIdx;
+        }
+        if (typeof bonusColumnIndex === 'number' && values[bonusColumnIndex] !== undefined) {
+            bonusPoints = parseNum(values[bonusColumnIndex]);
+        }
+ 
+        const pointsRawIncludesBonus = Boolean(editionConfig && editionConfig.pointsRawIncludesBonus);
+        // Compute the displayed/ final points according to manifest:
+        // - if CSV points already include bonus, use that value as final
+        // - otherwise add bonus to the CSV points to compute final
+        const pointsDisplayed = pointsRawIncludesBonus ? displayedCandidate : (displayedCandidate + bonusPoints);
+        const pointsFinal = pointsDisplayed;
+        // Keep pointsRaw as the displayed total (for UI expectations)
+        const pointsRaw = pointsDisplayed;
+
+        const canonical = {
+            id: String(id),
+            songName: songName,
+            stage: stageLabel || '',
+            pointsRaw: pointsRaw,
+            // Preserve parsed bonusPoints (may be 0 if edition indicates points already include bonus)
+            bonusPoints: bonusPoints,
+            pointsFinal: pointsFinal,
+            // Indicate whether this edition's points field already included bonus to avoid double-counting later
+            _editionPointsIncludeBonus: Boolean(pointsRawIncludesBonus),
+            votes12: parseNum(votes12),
+            votes10: parseNum(votes10),
+            votes8: parseNum(votes8),
+            votes7: parseNum(votes7),
+            votes6: parseNum(votes6),
+            votes5: parseNum(votes5),
+            votes4: parseNum(votes4),
+            votes3: parseNum(votes3),
+            votes2: parseNum(votes2),
+            votes1: parseNum(votes1),
+            numVoters: parseNum(numVotersRaw),
+            avgPoints: parseFloatSafe(avgPointsRaw),
+            weeklyRank: weeklyRank,
+            result: resultFlag,
+            _rawRow: values
+        };
+
+        result.push(canonical);
+    }
+
+    console.log('Parsed and normalized votes data (preview):', result.slice(0, 5));
+    return result;
+}
+
+/* Legacy parseVotesCSV removed.
+   The canonical, flexible parser defined earlier in this file produces normalized
+   vote objects with `stage` and `pointsFinal` fields. The old, legacy parser
+   would overwrite that function and return objects without the canonical fields,
+   causing filtering by stage/pointsFinal to fail. Keeping a note here for history.
+*/
+
+/* NOTE: This function was duplicated earlier in the file. The active loadEditionData
+   implementation is defined above. This duplicate has been removed to avoid conflicts. */
 
 function updateSongSelect() {
     const weekSelect = document.getElementById('weekSelect');
@@ -262,15 +659,19 @@ function updateSongSelect() {
     songSelect.innerHTML = '<option value="">Select Song</option>';
 
     if (selectedWeek && window.votes) {
-        const weekSongs = window.votes.filter(s => String(s.week) === String(selectedWeek));
+        const target = normalizeStageLabel(selectedWeek);
+        const weekSongs = window.votes.filter(s => {
+            const ns = normalizeStageLabel(s.stage) || normalizeStageLabel(s.week) || normalizeStageLabel(s.stageLabel);
+            return ns === target;
+        });
         console.log('Filtered songs for week:', weekSongs);
         
-        weekSongs.sort((a, b) => parseInt(b.points) - parseInt(a.points));
+        weekSongs.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
         
         weekSongs.forEach(song => {
             const option = document.createElement('option');
             option.value = song.songName;
-            option.textContent = `${song.songName} (${song.points} points)`;
+            option.textContent = `${song.songName} (${song.pointsFinal} points)`;
             songSelect.appendChild(option);
             console.log('Added song:', song.songName);
         });
@@ -287,18 +688,23 @@ function initializeWeekListeners() {
     // Song votes view listener
     weekSelect.addEventListener('change', (e) => {
         console.log('Week selection changed:', e.target.value);
-        const weekSongs = window.votes.filter(v => v.week === e.target.value);
+        const target = normalizeStageLabel(e.target.value);
+        const weekSongs = window.votes.filter(v => {
+            const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
+            const nr = normalizeStageLabel(v.result);
+            return ns === target || nr === target;
+        });
         console.log('Found songs:', weekSongs.length, weekSongs);
         
         const songSelect = document.getElementById('songSelect');
         songSelect.innerHTML = '<option value="">Select Song</option>';
         
         weekSongs
-            .sort((a, b) => parseInt(b.points) - parseInt(a.points))
+            .sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal))
             .forEach(song => {
                 const option = document.createElement('option');
                 option.value = song.songName;
-                option.textContent = `${song.songName} (${song.points} pts)`;
+                option.textContent = `${song.songName} (${song.pointsFinal} pts)`;
                 songSelect.appendChild(option);
             });
     });
@@ -309,7 +715,11 @@ function initializeWeekListeners() {
         console.log('Summary week changed:', selectedWeek);
         
         if (selectedWeek && window.votes) {
-            const weekVotes = window.votes.filter(v => String(v.week) === String(selectedWeek));
+            const target = normalizeStageLabel(selectedWeek);
+            const weekVotes = window.votes.filter(v => {
+                const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
+                return ns === target;
+            });
             console.log('Found votes for summary:', weekVotes.length, weekVotes);
             
             // Update podium and chart in a single call
@@ -324,26 +734,44 @@ function initializeWeekListeners() {
         const selectedWeek = weekSelect.value;
         
         if (selectedSong && selectedWeek) {
-            const songData = window.votes.find(v => 
-                v.songName === selectedSong && 
-                v.week === selectedWeek
+            const songData = window.votes.find(v =>
+                v.songName === selectedSong &&
+                v.stage === selectedWeek
             );
-            const submissionData = window.submissions.find(s => 
-                s.songTitle === selectedSong
-            );
+            const submissionData = (typeof window.findSubmissionBySongName === 'function')
+                ? window.findSubmissionBySongName(selectedSong)
+                : undefined;
             
             if (songData && submissionData) {
                 // Update stats display
                 document.querySelector('.stats-container').style.display = 'grid';
                 
                 // Update song info
-                document.getElementById('SongName').innerHTML = 
+                document.getElementById('SongName').innerHTML =
                     `<a href="${submissionData.songUrl}" target="_blank">${songData.songName}</a>`;
                 document.getElementById('sunoArtist').textContent = submissionData.sunoUsername;
                 document.getElementById('averageScore').textContent = songData.avgPoints;
                 document.getElementById('totalVoters').textContent = songData.numVoters;
-                document.getElementById('totalPoints').textContent = songData.points;
+                document.getElementById('totalPoints').textContent = songData.pointsFinal;
                 document.getElementById('weeklyRank').textContent = songData.weeklyRank;
+                
+                // Bonus: show separate bonus points card if present and non-zero
+                try {
+                    const bonus = (songData.bonusPoints ?? songData.bonus_points ?? 0);
+                    const bonusCard = document.getElementById('bonusPointsCard');
+                    const bonusEl = document.getElementById('bonusPoints');
+                    if (bonusCard && bonusEl) {
+                        if (Number(bonus) && Number(bonus) !== 0) {
+                            bonusEl.textContent = String(bonus);
+                            bonusCard.style.display = ''; // show card
+                        } else {
+                            bonusEl.textContent = '-';
+                            bonusCard.style.display = 'none';
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Failed to render bonus points', e);
+                }
                 
                 // Create/update audio player and visualizer
                 await updateAudioPlayer(submissionData.songUrl);
@@ -392,22 +820,139 @@ async function updateAudioPlayer(songUrl) {
         );
     }
 }
-function getWeeksFromVotes(votesData) {
-    // Get unique week values
-    const weeks = new Set(votesData.map(vote => vote.week));
-    console.log('Detected weeks:', [...weeks]);
-    
-    // Filter and sort numeric weeks
-    const numericWeeks = [...weeks]
-        .filter(week => !isNaN(week))
+/**
+ * Determine ordered weeks/stages for UI based on votes data and optional editionConfig.
+ * - If editionConfig.orderedStages exists, expand it (bunks, sequential weeks, single labels).
+ * - Otherwise infer order from the data, preferring "Bunk A..", "Showcase N", "Track Save", "2nd-chance", "Finals".
+ */
+function getWeeksFromVotes(votesData, editionConfig = {}) {
+    // Robust week/stage derivation with sanitization to avoid stray CSV artifacts
+    if (!Array.isArray(votesData)) return [];
+
+    // Extract raw stage candidates from canonical fields
+    const raw = votesData
+        .map(v => (v.stage ?? v.week ?? v.stageLabel ?? ''))
+        .map(s => (s === undefined || s === null) ? '' : String(s))
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    // Cleaning routine to remove common CSV/field artifacts like trailing ]", [SSC7 fragments, extra quotes, etc.
+    const cleanLabel = (s) => {
+        if (!s) return '';
+        let t = String(s).trim();
+
+        // Remove surrounding quotes
+        t = t.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+
+        // Remove trailing bracket+quote patterns e.g. `]"`
+        t = t.replace(/\]\s*"*$/g, '').replace(/\]\s*'*$/g, '');
+
+        // Remove common [SSC7] or similar markers which belong on song titles not stage labels
+        t = t.replace(/\[SSC\d*\]/gi, '');
+        t = t.replace(/\[SSC\d*/gi, '');
+        t = t.replace(/\[.*?SSC\d*.*?\]/gi, '');
+
+        // Replace multiple spaces/tabs/newlines with single space
+        t = t.replace(/\s+/g, ' ').trim();
+
+        return t;
+    };
+
+    const stages = [...new Set(raw.map(cleanLabel).filter(Boolean))];
+ 
+    // Separate numeric and non-numeric
+    const numeric = stages
+        .filter(s => !isNaN(s))
         .map(Number)
-        .sort((a, b) => a - b);
-    
-    // Add special weeks in correct order
-    if (weeks.has('2nd-chance')) numericWeeks.push('2nd-chance');
-    if (weeks.has('Finals')) numericWeeks.push('Finals');
-    
-    return numericWeeks;
+        .sort((a, b) => a - b)
+        .map(String);
+ 
+    const alphas = stages.filter(s => isNaN(s));
+ 
+    // Preferred ordering heuristics for alpha labels
+    const bunkRegex = /^bunk\s*([A-Za-z0-9]+)$/i;
+    const showcaseRegex = /showcase\s*(\d+)/i;
+ 
+    const bunks = alphas.filter(s => bunkRegex.test(s)).sort((a, b) => {
+        const ma = (a.match(bunkRegex) || [null, a])[1].toString().toUpperCase();
+        const mb = (b.match(bunkRegex) || [null, b])[1].toString().toUpperCase();
+        return ma.localeCompare(mb);
+    });
+ 
+    const showcases = alphas.filter(s => showcaseRegex.test(s)).sort((a, b) => {
+        const ma = a.match(showcaseRegex);
+        const mb = b.match(showcaseRegex);
+        const na = ma ? parseInt(ma[1], 10) : 0;
+        const nb = mb ? parseInt(mb[1], 10) : 0;
+        return na - nb;
+    });
+ 
+    const trackSaves = alphas.filter(s => /track\s*save/i.test(s) || /tracksave/i.test(s));
+    const secondChances = alphas.filter(s => /2nd|second\s*chance|2nd-?chance/i.test(s));
+    const finals = alphas.filter(s => /final/i.test(s));
+ 
+    // If editionConfig provides an orderedStages array, use it to generate the alpha ordering.
+    if (editionConfig && Array.isArray(editionConfig.orderedStages) && editionConfig.orderedStages.length > 0) {
+        const obsSet = new Set(alphas.map(a => a.toLowerCase()));
+        let ordered = [];
+ 
+        const normalizeForMatch = (s) => String(s || '').trim().toLowerCase();
+ 
+        for (const entry of editionConfig.orderedStages) {
+            if (!entry || !entry.type) continue;
+            if (entry.type === 'bunk') {
+                const groups = entry.groups || 0;
+                const prefix = entry.groupPrefix || 'Group ';
+                for (let i = 0; i < groups; i++) {
+                    const label = `${prefix}${String.fromCharCode(65 + i)}`; // A,B,C...
+                    if (obsSet.has(normalizeForMatch(label))) ordered.push(label);
+                }
+            } else if (entry.type === 'sequential') {
+                const weeksCount = entry.weeks || 0;
+                const prefix = entry.weekPrefix || (entry.label || 'Showcase ');
+                for (let i = 1; i <= weeksCount; i++) {
+                    const label = `${prefix}${i}`;
+                    if (obsSet.has(normalizeForMatch(label))) ordered.push(label);
+                }
+            } else if (entry.type === 'single') {
+                const label = entry.labelValue || entry.label || (entry.id || '');
+                if (label && obsSet.has(normalizeForMatch(label))) ordered.push(label);
+            } else {
+                // Fallback: treat entry.label as literal
+                const label = entry.label || '';
+                if (label && obsSet.has(normalizeForMatch(label))) ordered.push(label);
+            }
+        }
+ 
+        // If manifest provides explicit bunk groupLabels, ensure they appear in `ordered` in the manifest order.
+        const bunkEntry = editionConfig.orderedStages.find(e => e && e.type === 'bunk');
+        if (bunkEntry && Array.isArray(bunkEntry.groupLabels) && bunkEntry.groupLabels.length > 0) {
+            const manifestLabels = bunkEntry.groupLabels.map(l => String(l || '').trim()).filter(Boolean);
+            // Remove manifest-specified labels from current `ordered` to avoid duplicates,
+            // then prepend them in the exact manifest order (but only those actually present in data).
+            const normalize = normalizeForMatch;
+            const manifestIncluded = manifestLabels.filter(l => obsSet.has(normalize(l)));
+            const remainingOrdered = ordered.filter(x => !manifestIncluded.map(m => normalize(m)).includes(normalize(x)));
+            ordered = [...manifestIncluded, ...remainingOrdered];
+        }
+
+        // Remaining alpha labels not covered by manifest ordering
+        const remaining = alphas.filter(s => !ordered.map(x => normalizeForMatch(x)).includes(normalizeForMatch(s))).sort();
+ 
+        // Final order: numeric weeks + manifest ordered alphas + remaining
+        return [...numeric, ...ordered, ...remaining];
+    }
+ 
+    // Default fallback ordering (when no manifest ordering provided):
+    // Keep bunks/showcases near the top, then remaining labels, then track-save / 2nd-chance / finals
+    const prioritizedStart = [...bunks, ...showcases];
+    const tail = [...trackSaves, ...secondChances, ...finals];
+ 
+    // Remaining labels not matched above (exclude both prioritizedStart and tail)
+    const remaining = alphas.filter(s => ![...prioritizedStart, ...tail].includes(s)).sort();
+ 
+    // Final order: numeric weeks, bunks/showcases, remaining labels, then track-save / 2nd-chance / finals
+    return [...numeric, ...prioritizedStart, ...remaining, ...tail];
 }
 
 function initializeSelects(weeks) {
@@ -417,7 +962,18 @@ function initializeSelects(weeks) {
     weekSelect.innerHTML = '<option value="">Select Week</option>';
     summaryWeekSelect.innerHTML = '<option value="">Select Week</option>';
     
-    weeks.forEach(week => {
+    console.log('initializeSelects called with weeks:', weeks);
+    
+    // Fallback: if weeks is empty, derive from window.votes
+    let effectiveWeeks = weeks;
+    if (!effectiveWeeks || !Array.isArray(effectiveWeeks) || effectiveWeeks.length === 0) {
+        console.warn('initializeSelects: received empty weeks; deriving from window.votes');
+        effectiveWeeks = [...new Set((window.votes || []).map(v => (v.stage ?? v.week ?? v.stageLabel ?? '').toString()).filter(Boolean))];
+    }
+    
+    console.log('initializeSelects effectiveWeeks:', effectiveWeeks);
+    
+    effectiveWeeks.forEach(week => {
         const option = document.createElement('option');
         option.value = week;
         option.textContent = isNaN(week) ? week : `Week ${week}`;
@@ -480,7 +1036,11 @@ function updateWeeklySummary(selectedWeek) {
     podiumSection.style.display = selectedWeek ? 'block' : 'none';
     
     if (selectedWeek && window.votes) {
-        const weekVotes = window.votes.filter(v => String(v.week) === String(selectedWeek));
+        const target = normalizeStageLabel(selectedWeek);
+        const weekVotes = window.votes.filter(v => {
+            const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
+            return ns === target;
+        });
         console.log('Processing votes for weekly summary:', weekVotes.length);
         
         handleWeeklySummaryUpdate(weekVotes, selectedWeek);
@@ -489,13 +1049,13 @@ function updateWeeklySummary(selectedWeek) {
 
 function handleWeeklySummaryUpdate(weekVotes, selectedWeek) {
     // Clear previous chart
-    if (window.chart) {
-        window.chart.destroy();
-        window.chart = null;
+    if (window.weekChart) {
+        window.weekChart.destroy();
+        window.weekChart = null;
     }
     
     // Sort votes once
-    const sortedVotes = weekVotes.sort((a, b) => parseInt(b.points) - parseInt(a.points));
+    const sortedVotes = weekVotes.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
     console.log('Sorted votes for display:', sortedVotes);
     
     // Single call to update podium
@@ -508,71 +1068,220 @@ function handleWeeklySummaryUpdate(weekVotes, selectedWeek) {
 
 // Make updateWeeklySummary globally availablewindow.updateWeeklySummary = updateWeeklySummary;window.updateWeeklySummary = updateWeeklySummary;
 
-function updateWeeklySummaryChart(sortedVotes, selectedWeek) {
+function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
     const chartCanvas = document.getElementById('weekSummaryChart');
-    chartCanvas.style.height = '1200px';
-    
-    if (window.chart) {
-        window.chart.destroy();
+    if (!chartCanvas) {
+        console.error('updateWeeklySummaryChart: canvas element with id "weekSummaryChart" not found');
+        return;
     }
-    
-    console.log('Creating chart with votes:', sortedVotes.length);
-    
-    const ctx = chartCanvas.getContext('2d');
-    window.chart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: sortedVotes.map(v => v.songName),
-            datasets: [{
-                label: 'Total Points',
-                data: sortedVotes.map(v => parseInt(v.points)),
-                backgroundColor: 'rgba(90, 30, 90, 0.6)',
-                borderColor: 'rgba(90, 30, 90, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: 'y',
-            layout: {
-                padding: {
-                    left: 15,
-                    right: 15,
-                    top: 20,
-                    bottom: 20
-                }
+
+    // Pagination configuration (default 40 rows per page for readability)
+    const DEFAULT_PAGE_SIZE = 40;
+    const totalItems = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
+    const totalPages = Math.max(1, Math.ceil(totalItems / DEFAULT_PAGE_SIZE));
+
+    // Ensure the chart container exists
+    const chartContainerEl = chartCanvas.parentNode;
+    if (!chartContainerEl) return;
+
+    // Remove any previous pagination controls
+    const existingControls = document.getElementById('weekSummaryPagination');
+    if (existingControls) existingControls.remove();
+
+    // Create pagination controls
+    const controls = document.createElement('div');
+    controls.id = 'weekSummaryPagination';
+    controls.style.display = 'flex';
+    controls.style.gap = '8px';
+    controls.style.alignItems = 'center';
+    controls.style.marginBottom = '8px';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '◀ Prev';
+    prevBtn.style.padding = '6px 10px';
+    prevBtn.style.cursor = 'pointer';
+
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Next ▶';
+    nextBtn.style.padding = '6px 10px';
+    nextBtn.style.cursor = 'pointer';
+
+    const pageInfo = document.createElement('span');
+    pageInfo.id = 'weekSummaryPageInfo';
+    pageInfo.style.color = 'var(--text-color)';
+    pageInfo.style.fontSize = '0.95rem';
+    pageInfo.textContent = `Page 1 / ${totalPages}`;
+
+    const pageSizeLabel = document.createElement('label');
+    pageSizeLabel.style.color = 'var(--text-color)';
+    pageSizeLabel.style.fontSize = '0.9rem';
+    pageSizeLabel.textContent = ' per page: ';
+
+    const pageSizeSelect = document.createElement('select');
+    [10, 25, 40, 50, 100].forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = String(n);
+        opt.textContent = String(n);
+        if (n === DEFAULT_PAGE_SIZE) opt.selected = true;
+        pageSizeSelect.appendChild(opt);
+    });
+
+    pageSizeSelect.style.marginLeft = '4px';
+    pageSizeSelect.style.padding = '4px';
+
+    controls.appendChild(prevBtn);
+    controls.appendChild(nextBtn);
+    controls.appendChild(pageInfo);
+    controls.appendChild(pageSizeLabel);
+    controls.appendChild(pageSizeSelect);
+
+    // Insert controls before the chartCanvas
+    chartContainerEl.insertBefore(controls, chartCanvas);
+
+    // State
+    let pageSize = DEFAULT_PAGE_SIZE;
+    let currentPage = 1;
+
+    // Debounced resize: re-render current page when viewport changes (keeps chart responsive on mobile)
+    function debounce(fn, wait){ let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); }; }
+    const handleResize = debounce(() => { renderPage(); }, 250);
+
+    // Attach resize listener once
+    if (!window._ssc_week_summary_resize_attached) {
+        window.addEventListener('resize', handleResize);
+        window._ssc_week_summary_resize_attached = true;
+    }
+
+    function renderPage() {
+        // Validate page
+        const pages = Math.max(1, Math.ceil(totalItems / pageSize));
+        if (currentPage > pages) currentPage = pages;
+        if (currentPage < 1) currentPage = 1;
+
+        // Update page info
+        pageInfo.textContent = `Page ${currentPage} / ${pages}`;
+
+        // Slice the votes for this page
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = Math.min(startIdx + pageSize, totalItems);
+        const pageVotes = sortedVotes.slice(startIdx, endIdx);
+
+        // Compute canvas height for this small page (approx 40px per item clamped)
+        const pageItemCount = pageVotes.length;
+        const computed = Math.max(300, Math.min(40 * pageItemCount + 200, 1200));
+
+        // Make the chart container vertically scrollable if needed and set reasonable max height
+        chartContainerEl.style.overflowY = 'auto';
+        chartContainerEl.style.maxHeight = '80vh';
+
+        // Keep canvas width responsive to container and apply CSS + pixel sizing
+        chartCanvas.style.width = '100%';
+        chartCanvas.style.height = `${computed}px`;
+        try {
+            const dpr = window.devicePixelRatio || 1;
+            // Use the container width to keep visible width stable when changing page size
+            const cssWidth = (chartContainerEl && chartContainerEl.clientWidth) ? chartContainerEl.clientWidth : (chartCanvas.clientWidth || parseInt(getComputedStyle(chartCanvas).width, 10) || 800);
+            const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
+            const pixelHeight = Math.max(1, Math.floor(computed * dpr));
+            chartCanvas.setAttribute('width', String(pixelWidth));
+            chartCanvas.setAttribute('height', String(pixelHeight));
+            chartCanvas.width = pixelWidth;
+            chartCanvas.height = pixelHeight;
+            if (window.Chart && window.Chart.defaults) {
+                window.Chart.defaults.devicePixelRatio = dpr;
+            }
+        } catch (e) {
+            // ignore sizing hiccups
+        }
+
+        // Destroy previous chart if exists
+        if (window.weekChart) {
+            try { window.weekChart.destroy(); } catch (e) { /* ignore */ }
+            window.weekChart = null;
+        }
+
+        // Prepare data for page
+        const dataPoints = pageVotes.map(v => Number(v.pointsFinal ?? v.points ?? 0));
+        const labels = pageVotes.map(v => v.songName ?? '');
+
+        // Adjust visual parameters for page size and container width (mobile friendly)
+        const containerWidth = chartContainerEl.clientWidth || 360;
+        // smaller fonts on narrow screens
+        const fontSizeY = containerWidth < 420 ? Math.max(9, Math.floor(12 - (pageItemCount / 80))) : (pageItemCount > 50 ? 11 : 12);
+        // thinner bars on narrow screens to keep spacing reasonable
+        const baseThickness = Math.floor(computed / Math.max(1, pageItemCount));
+        const barThickness = Math.max(2, Math.min(12, containerWidth < 420 ? Math.max(2, Math.floor(baseThickness * 0.6)) : Math.max(4, baseThickness)));
+
+        // Create Chart.js instance for this page
+        window.weekChart = new Chart(chartCanvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Total Points',
+                    data: dataPoints,
+                    backgroundColor: 'rgba(90, 30, 90, 0.95)',
+                    borderColor: 'rgba(90, 30, 90, 1)',
+                    borderWidth: 1,
+                    barThickness: barThickness
+                }]
             },
-            scales: {
-                y: {
-                    ticks: {
-                        color: '#ffffff',
-                        font: { size: 14, weight: 'bold' },
-                        padding: 10
+            options: {
+                responsive: false,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                animation: { duration: 200 },
+                layout: {
+                    padding: { left: 15, right: 15, top: 10, bottom: 10 }
+                },
+                scales: {
+                    y: {
+                        ticks: { color: '#ffffff', font: { size: fontSizeY, weight: 'bold' }, padding: 6, autoSkip: false },
+                        grid: { color: 'rgba(255,255,255,.08)' }
                     },
-                    grid: {
-                        color: 'rgba(255,255,255,.15)'
+                    x: {
+                        ticks: { color: '#ffffff', font: { size: 12, weight: 'bold' } },
+                        grid: { color: 'rgba(255,255,255,.08)' }
                     }
                 },
-                x: {
-                    ticks: {
+                plugins: {
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: `${selectedWeek} Points Distribution (items ${startIdx + 1}-${endIdx} of ${totalItems})`,
                         color: '#ffffff',
-                        font: { size: 14, weight: 'bold' }
+                        font: { size: 16, weight: 'bold' }
                     },
-                    grid: {
-                        color: 'rgba(255,255,255,.15)'
+                    tooltip: {
+                        enabled: true,
+                        mode: 'nearest',
+                        intersect: false
                     }
                 }
-            },
-            plugins: {
-                legend: { display: false },
-                title: {
-                    display: true,
-                    text: `Week ${selectedWeek} Points Distribution`,
-                    color: '#ffffff',
-                    font: { size: 18, weight: 'bold' }
-                }
             }
+        });
+    }
+
+    // Wire up controls
+    prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPage();
         }
     });
+    nextBtn.addEventListener('click', () => {
+        const pages = Math.max(1, Math.ceil(totalItems / pageSize));
+        if (currentPage < pages) {
+            currentPage++;
+            renderPage();
+        }
+    });
+    pageSizeSelect.addEventListener('change', (e) => {
+        pageSize = parseInt(e.target.value, 10) || DEFAULT_PAGE_SIZE;
+        currentPage = 1; // reset to first page
+        renderPage();
+    });
+
+    // Initial render
+    renderPage();
 }
