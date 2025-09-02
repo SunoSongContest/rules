@@ -365,24 +365,23 @@ function updateWeeklySummary() {
         window.weekChart = null;
     }
     
-    updatePodium(weekVotes);
-    
-    // Reset chart size before updating
-    const chartCanvas = document.getElementById('weekSummaryChart');
-    if (chartCanvas) {
-        // Clear any explicit height so Chart.js can recompute natural layout.
-        // Actual height will be computed after we know the number of bars (sortedVotes).
-        chartCanvas.style.height = '';
-    }
-    
+    // Sort votes once (do this before any use of `sortedVotes`)
     const sortedVotes = [...weekVotes].sort((a, b) => {
         const pa = Number(a.pointsFinal ?? a.points ?? 0);
         const pb = Number(b.pointsFinal ?? b.points ?? 0);
         return pb - pa;
     });
     
-    // Now that we know how many items will be displayed, compute chart height to avoid large blank areas.
+    // Single call to update podium with the sorted list
+    updatePodium(sortedVotes);
+    
+    // Reset chart size before updating
+    const chartCanvas = document.getElementById('weekSummaryChart');
     if (chartCanvas) {
+        // Clear any explicit height so Chart.js can recompute natural layout.
+        chartCanvas.style.height = '';
+        // Compute chart height based on number of bars to avoid excessive blank space.
+        // Approx 40px per row + padding; clamp between 400px and 1200px.
         const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
         const computed = Math.max(400, Math.min(40 * itemCount + 200, 1200));
         chartCanvas.style.height = `${computed}px`;
