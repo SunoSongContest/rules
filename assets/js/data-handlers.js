@@ -659,11 +659,10 @@ function updateSongSelect() {
     songSelect.innerHTML = '<option value="">Select Song</option>';
 
     if (selectedWeek && window.votes) {
+        const target = normalizeStageLabel(selectedWeek);
         const weekSongs = window.votes.filter(s => {
             const ns = normalizeStageLabel(s.stage) || normalizeStageLabel(s.week) || normalizeStageLabel(s.stageLabel);
-            const nr = normalizeStageLabel(s.result);
-            const target = normalizeStageLabel(selectedWeek);
-            return ns === target || nr === target;
+            return ns === target;
         });
         console.log('Filtered songs for week:', weekSongs);
         
@@ -719,8 +718,7 @@ function initializeWeekListeners() {
             const target = normalizeStageLabel(selectedWeek);
             const weekVotes = window.votes.filter(v => {
                 const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
-                const nr = normalizeStageLabel(v.result);
-                return ns === target || nr === target;
+                return ns === target;
             });
             console.log('Found votes for summary:', weekVotes.length, weekVotes);
             
@@ -1041,8 +1039,7 @@ function updateWeeklySummary(selectedWeek) {
         const target = normalizeStageLabel(selectedWeek);
         const weekVotes = window.votes.filter(v => {
             const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
-            const nr = normalizeStageLabel(v.result);
-            return ns === target || nr === target;
+            return ns === target;
         });
         console.log('Processing votes for weekly summary:', weekVotes.length);
         
