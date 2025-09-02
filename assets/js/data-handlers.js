@@ -1167,51 +1167,85 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
     }
 
     // Create Chart.js instance with initial data (may be empty).
-    // Use the canvas element itself as the first argument (some Chart.js builds
-    // perform better when given the element instead of a 2D context).
-    window.weekChart = new Chart(chartCanvas, {
-        type: 'bar',
-        data: {
-            // Start with the labels/data we computed. We'll re-assign explicitly
-            // after creation to guard against Chart.js clearing behaviour.
-            labels: labels,
-            datasets: [{
-                label: 'Total Points',
-                data: dataPoints,
-                backgroundColor: 'rgba(90, 30, 90, 0.95)',
-                borderColor: 'rgba(90, 30, 90, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: 'y',
-            animation: { duration: 300 },
-            layout: {
-                padding: { left: 15, right: 15, top: 20, bottom: 20 }
+    // We force a fixed drawing buffer and disable Chart.js responsive autosizing so the
+    // tall canvas we prepared is used as the drawing surface.
+    try {
+        // Compute visual parameters tuned for large lists
+        const totalItems = Array.isArray(sortedVotes) ? sortedVotes.length : labels.length;
+        const barThickness = Math.max(2, Math.floor(Math.max(2, (computed / Math.max(1, totalItems)))));
+        const fontSizeY = (totalItems > 300 ? 9 : (totalItems > 200 ? 10 : (totalItems > 100 ? 11 : 12)));
+
+        // Make horizontal scrolling available if labels are long
+        try {
+            const longestLabel = labels.reduce((a, b) => (a && a.length > b.length ? a : b), '');
+            const estimatedLabelWidth = Math.min(4000, Math.max(800, (longestLabel ? longestLabel.length : 20) * 8 + 200));
+            const chartContainerEl = chartCanvas.parentNode;
+            if (chartContainerEl && chartContainerEl.classList && chartContainerEl.classList.contains('chart-container')) {
+                chartContainerEl.style.overflowX = 'auto';
+                chartContainerEl.style.whiteSpace = 'nowrap';
+            }
+            chartCanvas.style.minWidth = `${estimatedLabelWidth}px`;
+        } catch (e) {
+            console.warn('Label width heuristic failed', e);
+        }
+
+        // Ensure Chart.js treats canvas as fixed-size drawing buffer
+        if (window.Chart && window.Chart.defaults) {
+            window.Chart.defaults.responsive = false;
+            // leave devicePixelRatio already set earlier
+        }
+
+        window.weekChart = new Chart(chartCanvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Total Points',
+                    data: dataPoints,
+                    backgroundColor: 'rgba(90, 30, 90, 0.95)',
+                    borderColor: 'rgba(90, 30, 90, 1)',
+                    borderWidth: 1,
+                    barThickness: barThickness
+                }]
             },
-            scales: {
-                y: {
-                    ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' }, padding: 10 },
-                    grid: { color: 'rgba(255,255,255,.15)' }
+            options: {
+                // disable internal responsive resizing; we manage canvas size explicitly
+                responsive: false,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                animation: { duration: 300 },
+                layout: {
+                    padding: { left: 15, right: 15, top: 20, bottom: 20 }
                 },
-                x: {
-                    ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' } },
-                    grid: { color: 'rgba(255,255,255,.15)' }
-                }
-            },
-            plugins: {
-                legend: { display: false },
-                title: {
-                    display: true,
-                    text: `${selectedWeek} Points Distribution`,
-                    color: '#ffffff',
-                    font: { size: 18, weight: 'bold' }
+                scales: {
+                    y: {
+                        ticks: { color: '#ffffff', font: { size: fontSizeY, weight: 'bold' }, padding: 6, autoSkip: false },
+                        grid: { color: 'rgba(255,255,255,.15)' }
+                    },
+                    x: {
+                        ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' } },
+                        grid: { color: 'rgba(255,255,255,.15)' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    title: {
+                        display: true,
+                        text: `${selectedWeek} Points Distribution`,
+                        color: '#ffffff',
+                        font: { size: 18, weight: 'bold' }
+                    },
+                    tooltip: {
+                        enabled: true,
+                        mode: 'nearest',
+                        intersect: false
+                    }
                 }
             }
-        }
-    });
+        });
+    } catch (e) {
+        console.error('Failed to create weekChart with forced sizing', e);
+    }
 
     // Immediately (synchronously) re-assign the chart data to ensure nothing in Chart.js
     // runtime overwrites/clears it. Then force an update.
