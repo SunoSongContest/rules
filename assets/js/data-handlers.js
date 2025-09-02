@@ -260,17 +260,30 @@ function parseSubmissionsCSV(csv) {
             if (typeof values[j] === 'string') values[j] = values[j].trim();
         }
 
-        // Based on the submissions CSV structure:
-        // index 0 => numeric id
-        // index 1 => Discord Name
-        // index 2 => Discord display name
-        // index 3 => Suno username
-        // index 4 => Song Title
-        // index 5 => Song URL
-        // Defensive mapping: use header-like fallbacks if positions vary
-        const songTitle = values[4] || values[3] || '';
-        const sunoUsername = values[3] || values[4] || '';
-        const songUrl = values[5] || '';
+        // Determine column indices using the header row when available (handles SSC6 vs SSC7 differences)
+        // Fallback to sensible index guesses when header names aren't present.
+        const headerRow = rows[0] || [];
+        const headerLower = headerRow.map(h => (h || '').toString().toLowerCase());
+        let songTitleIndex = headerLower.findIndex(h => /(^|\b)song\b.*\btitle\b|^song\s*title$|^title$/i.test(h));
+        if (songTitleIndex === -1) {
+            // try looser match for "song title" or "song"
+            songTitleIndex = headerLower.findIndex(h => /\bsong\b/i.test(h));
+        }
+        let sunoIndex = headerLower.findIndex(h => /suno/i.test(h) || /suno username/i.test(h));
+        // If header detection failed, fall back to common index patterns:
+        if (songTitleIndex === -1 && sunoIndex === -1) {
+            // SSC6 style: index 3 = Suno username, 4 = Song title
+            // SSC7 style: index 3 = Song title, 4 = Suno username
+            // Choose by inspecting which field looks like a URL in index 5 etc.
+            songTitleIndex = (values[4] && values[4].toString().trim() !== '') ? 4 : 3;
+            sunoIndex = (songTitleIndex === 4) ? 3 : 4;
+        } else {
+            if (songTitleIndex === -1) songTitleIndex = (sunoIndex === 4 ? 3 : 4);
+            if (sunoIndex === -1) sunoIndex = (songTitleIndex === 4 ? 3 : 4);
+        }
+        const songTitle = (values[songTitleIndex] || '').toString().trim();
+        const sunoUsername = (values[sunoIndex] || '').toString().trim();
+        const songUrl = (values[5] || values[6] || '').toString().trim();
 
         // Only include if we have a song title
         if (songTitle) {
@@ -593,7 +606,7 @@ function initializeWeekListeners() {
             );
             const submissionData = (typeof window.findSubmissionBySongName === 'function')
                 ? window.findSubmissionBySongName(selectedSong)
-                : ((window.submissions || []).find(s => s.songTitle === selectedSong) || undefined);
+                : undefined;
             
             if (songData && submissionData) {
                 // Update stats display
