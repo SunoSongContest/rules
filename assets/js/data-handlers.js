@@ -298,7 +298,7 @@ function parseSubmissionsCSV(csv) {
     return result;
 }
 
-/* Helper: normalize song titles for matching (strip bracketed suffixes like "[SSC7, USA]") */
+/* Helper: normalize song titles for matching (strip trailing bracketed/parenthesized suffixes like "[SSC7, USA]" or "(SSC7 USA)") */
 function normalizeSongTitle(title) {
     if (!title && title !== 0) return '';
     // Coerce and trim
@@ -307,9 +307,11 @@ function normalizeSongTitle(title) {
     // Normalize smart quotes/dashes to ASCII equivalents
     t = t.replace(/[“”„‟"]/g, '"').replace(/[‘’‛']/g, "'").replace(/[\u2013\u2014]/g, '-');
 
-    // Remove only trailing bracketed suffixes (safer than removing from first '[')
+    // Remove only trailing bracketed or parenthesized suffixes (safer than removing from first '[' or '(')
     // e.g. "What Am I Doing? [SSC7, United States]" -> "What Am I Doing?"
+    //       "Strange Creek (SSC7 USA)" -> "Strange Creek"
     t = t.replace(/\s*\[[^\]]*\]\s*$/g, '');
+    t = t.replace(/\s*\([^\)]*\)\s*$/g, '');
 
     // Remove surrounding quotes/apostrophes
     t = t.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
@@ -331,11 +333,63 @@ function normalizeSongTitle(title) {
     return t;
 }
 
-/* Helper: find a submission by song name using normalized comparison */
+/* Helper: compute small edit distance (Levenshtein) for fuzzy fallback */
+function levenshtein(a, b) {
+    const al = a.length, bl = b.length;
+    if (al === 0) return bl;
+    if (bl === 0) return al;
+    const matrix = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
+    for (let i = 0; i <= al; i++) matrix[i][0] = i;
+    for (let j = 0; j <= bl; j++) matrix[0][j] = j;
+    for (let i = 1; i <= al; i++) {
+        for (let j = 1; j <= bl; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            matrix[i][j] = Math.min(
+                matrix[i - 1][j] + 1,      // deletion
+                matrix[i][j - 1] + 1,      // insertion
+                matrix[i - 1][j - 1] + cost // substitution
+            );
+        }
+    }
+    return matrix[al][bl];
+}
+
+/* Helper: find a submission by song name using normalized comparison with fallbacks:
+   1) exact normalized equality
+   2) normalized substring (one contains the other)
+   3) fuzzy Levenshtein distance (small threshold)
+*/
 function findSubmissionBySongName(songName) {
+    if (!Array.isArray(window.submissions) || !songName) return undefined;
     const norm = normalizeSongTitle(songName);
-    if (!Array.isArray(window.submissions)) return undefined;
-    return window.submissions.find(s => normalizeSongTitle(s.songTitle) === norm);
+
+    // Exact match first
+    let match = window.submissions.find(s => normalizeSongTitle(s.songTitle) === norm);
+    if (match) return match;
+
+    // Substring match (handle small formatting differences)
+    match = window.submissions.find(s => {
+        const sn = normalizeSongTitle(s.songTitle);
+        return sn.includes(norm) || norm.includes(sn);
+    });
+    if (match) return match;
+
+    // Fuzzy fallback: allow small edit distance relative to length
+    let best = null;
+    let bestScore = Infinity;
+    for (const s of window.submissions) {
+        const sn = normalizeSongTitle(s.songTitle);
+        if (!sn) continue;
+        const dist = levenshtein(norm, sn);
+        const rel = dist / Math.max(1, Math.max(norm.length, sn.length));
+        if (rel < 0.18 && dist < bestScore) { // threshold: ~18% difference or small absolute diff
+            best = s;
+            bestScore = dist;
+        }
+    }
+    if (best) return best;
+
+    return undefined;
 }
 
 // Expose helper globally so other modules can use it
