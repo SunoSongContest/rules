@@ -99,23 +99,36 @@ async function loadEditionData(event) {
 // Normalize legacy/compat fields so UI filters work reliably.
 // Ensure every vote has both `stage` and `pointsFinal` populated.
 if (window.votes && Array.isArray(window.votes)) {
+    // Determine if this edition's manifest indicates points already include bonus
+    const editionPointsIncludeBonus = Boolean( (typeof window.CSV_MANIFEST?.getEditionConfig === 'function') && (() => {
+        try {
+            // Attempt to infer edition from loaded files path or leave false if unavailable.
+            // This is best-effort; loadEditionData normally passes editionConfig, but this fallback is defensive.
+            return false;
+        } catch (e) { return false; }
+    })() );
+ 
     window.votes.forEach(v => {
         // stage fallback: stage <- week <- stageLabel
         v.stage = (v.stage || v.week || v.stageLabel || '').toString();
-
+ 
         // pointsFinal fallback: prefer existing pointsFinal, otherwise use points + bonusPoints (or numeric points)
         const parseNum = x => {
             if (x === undefined || x === null || x === '') return 0;
             const n = parseInt(String(x).replace(/[^0-9-]/g, ''), 10);
             return isNaN(n) ? 0 : n;
         };
-
+ 
         if (v.pointsFinal === undefined || v.pointsFinal === null || v.pointsFinal === '') {
             const rawPoints = parseNum(v.points);
             const bonus = parseNum(v.bonusPoints);
-            v.pointsFinal = rawPoints + bonus;
+            // If the manifest/edition indicates points already include bonus, do not add it again.
+            // The more specific parsing stage (parseVotesCSV) will set editionConfig.pointsRawIncludesBonus when known;
+            // this normalization is defensive — prefer rawPoints when points already include bonus.
+            const pointsRawIncludesBonus = Boolean(v._editionPointsIncludeBonus || false);
+            v.pointsFinal = pointsRawIncludesBonus ? rawPoints : (rawPoints + bonus);
         }
-
+ 
         // ensure points also exists as numeric string for legacy code paths
         if (v.points === undefined || v.points === null) {
             v.points = String(v.pointsFinal || 0);
@@ -123,6 +136,34 @@ if (window.votes && Array.isArray(window.votes)) {
     });
 }
 
+        // Recompute pointsFinal deterministically according to manifest flag to avoid any double-counting.
+        // Some editions (SSC7) indicate the points column already includes bonus; the manifest flag
+        // `pointsRawIncludesBonus` controls this behavior.
+        const pointsRawIncludesBonus = Boolean(editionConfig && editionConfig.pointsRawIncludesBonus);
+        const toNum = (x) => {
+            if (x === undefined || x === null || x === '') return 0;
+            const s = String(x).trim().replace(/\u00A0/g, '').replace(/[^0-9.\-]/g, '');
+            const n = Number(s);
+            return isNaN(n) ? 0 : n;
+        };
+        if (Array.isArray(window.votes)) {
+            window.votes.forEach(v => {
+                // preserve existing raw fields where available
+                const rawPoints = toNum(v.pointsRaw ?? v.points ?? v.pointsFinal ?? 0);
+                const bonus = toNum(v.bonusPoints ?? 0);
+                if (pointsRawIncludesBonus) {
+                    v.pointsFinal = rawPoints;
+                    // if the CSV already included bonus in points, keep bonusPoints as parsed (may be 0 or present)
+                    v.bonusPoints = bonus;
+                } else {
+                    v.bonusPoints = bonus;
+                    v.pointsFinal = rawPoints + bonus;
+                }
+                // keep legacy `points` string in sync
+                v.points = String(v.pointsFinal || 0);
+            });
+        }
+ 
         // Determine weeks/stages for UI
         const weeks = getWeeksFromVotes(window.votes, editionConfig);
 
@@ -525,7 +566,8 @@ function parseVotesCSV(csv, editionConfig = {}) {
 
         const pointsRaw = parseNum(pointsRawStr);
 
-        // Bonus handling (auto-detected).
+        // Bonus handling (auto-detected). Honor editionConfig.pointsRawIncludesBonus when present.
+        const pointsRawIncludesBonus = Boolean(editionConfig && editionConfig.pointsRawIncludesBonus);
         let bonusPoints = 0;
         let bonusColumnIndex = undefined;
         if (typeof colMap.bonusPoints === 'number') {
@@ -537,16 +579,20 @@ function parseVotesCSV(csv, editionConfig = {}) {
         if (typeof bonusColumnIndex === 'number' && values[bonusColumnIndex] !== undefined) {
             bonusPoints = parseNum(values[bonusColumnIndex]);
         }
-
-        const pointsFinal = pointsRaw + (bonusPoints || 0);
+ 
+        // If pointsRaw already includes bonus (per manifest), do not add bonusPoints again.
+        const pointsFinal = pointsRawIncludesBonus ? pointsRaw : pointsRaw + (bonusPoints || 0);
 
         const canonical = {
             id: String(id),
             songName: songName,
             stage: stageLabel || '',
             pointsRaw: pointsRaw,
+            // Preserve parsed bonusPoints (may be 0 if edition indicates points already include bonus)
             bonusPoints: bonusPoints,
             pointsFinal: pointsFinal,
+            // Indicate whether this edition's points field already included bonus to avoid double-counting later
+            _editionPointsIncludeBonus: Boolean(pointsRawIncludesBonus),
             votes12: parseNum(votes12),
             votes10: parseNum(votes10),
             votes8: parseNum(votes8),
