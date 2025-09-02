@@ -1075,126 +1075,128 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         return;
     }
 
-    // Compute chart height based on number of bars to avoid excessive blank space.
-    // Approx 40px per row + padding; clamp between 400px and 5000px.
-    const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
-    const computed = Math.max(400, Math.min(40 * itemCount + 200, 5000));
+    // Pagination configuration
+    const DEFAULT_PAGE_SIZE = 25;
+    const totalItems = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
+    const totalPages = Math.max(1, Math.ceil(totalItems / DEFAULT_PAGE_SIZE));
 
-    // Ensure the parent chart container becomes scrollable for very tall charts so the page doesn't
-    // grow unbounded while still allowing the chart to render at a readable height.
+    // Ensure the chart container exists
     const chartContainerEl = chartCanvas.parentNode;
-    if (chartContainerEl && chartContainerEl.classList && chartContainerEl.classList.contains('chart-container')) {
+    if (!chartContainerEl) return;
+
+    // Remove any previous pagination controls
+    const existingControls = document.getElementById('weekSummaryPagination');
+    if (existingControls) existingControls.remove();
+
+    // Create pagination controls
+    const controls = document.createElement('div');
+    controls.id = 'weekSummaryPagination';
+    controls.style.display = 'flex';
+    controls.style.gap = '8px';
+    controls.style.alignItems = 'center';
+    controls.style.marginBottom = '8px';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '◀ Prev';
+    prevBtn.style.padding = '6px 10px';
+    prevBtn.style.cursor = 'pointer';
+
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Next ▶';
+    nextBtn.style.padding = '6px 10px';
+    nextBtn.style.cursor = 'pointer';
+
+    const pageInfo = document.createElement('span');
+    pageInfo.id = 'weekSummaryPageInfo';
+    pageInfo.style.color = 'var(--text-color)';
+    pageInfo.style.fontSize = '0.95rem';
+    pageInfo.textContent = `Page 1 / ${totalPages}`;
+
+    const pageSizeLabel = document.createElement('label');
+    pageSizeLabel.style.color = 'var(--text-color)';
+    pageSizeLabel.style.fontSize = '0.9rem';
+    pageSizeLabel.textContent = ' per page: ';
+
+    const pageSizeSelect = document.createElement('select');
+    [10, 25, 50, 100].forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = String(n);
+        opt.textContent = String(n);
+        if (n === DEFAULT_PAGE_SIZE) opt.selected = true;
+        pageSizeSelect.appendChild(opt);
+    });
+
+    pageSizeSelect.style.marginLeft = '4px';
+    pageSizeSelect.style.padding = '4px';
+
+    controls.appendChild(prevBtn);
+    controls.appendChild(nextBtn);
+    controls.appendChild(pageInfo);
+    controls.appendChild(pageSizeLabel);
+    controls.appendChild(pageSizeSelect);
+
+    // Insert controls before the chartCanvas
+    chartContainerEl.insertBefore(controls, chartCanvas);
+
+    // State
+    let pageSize = DEFAULT_PAGE_SIZE;
+    let currentPage = 1;
+
+    function renderPage() {
+        // Validate page
+        const pages = Math.max(1, Math.ceil(totalItems / pageSize));
+        if (currentPage > pages) currentPage = pages;
+        if (currentPage < 1) currentPage = 1;
+
+        // Update page info
+        pageInfo.textContent = `Page ${currentPage} / ${pages}`;
+
+        // Slice the votes for this page
+        const startIdx = (currentPage - 1) * pageSize;
+        const endIdx = Math.min(startIdx + pageSize, totalItems);
+        const pageVotes = sortedVotes.slice(startIdx, endIdx);
+
+        // Compute canvas height for this small page (approx 40px per item clamped)
+        const pageItemCount = pageVotes.length;
+        const computed = Math.max(300, Math.min(40 * pageItemCount + 200, 1200));
+
+        // Make the chart container vertically scrollable if needed and set reasonable max height
         chartContainerEl.style.overflowY = 'auto';
         chartContainerEl.style.maxHeight = '80vh';
-    }
 
-    // Set both CSS height and the canvas element's height attribute so Chart.js uses the intended
-    // drawing size (chart libraries often read the canvas height attribute or the actual pixel size).
-    chartCanvas.style.height = `${computed}px`;
-    try {
-        chartCanvas.setAttribute('height', String(Math.floor(computed)));
-        chartCanvas.height = Math.floor(computed);
-    } catch (e) {
-        // Non-fatal: if setting attributes fails in some environments, continue.
-        console.warn('Unable to set canvas height attribute:', e);
-    }
-
-    // Destroy previous chart instance if present
-    if (window.weekChart) {
-        try { window.weekChart.destroy(); } catch (e) { /* ignore */ }
-        window.weekChart = null;
-    }
-
-    console.log('Creating chart with votes:', Array.isArray(sortedVotes) ? sortedVotes.length : 0);
-
-    // Robust numeric parsing for points (accept numbers, numeric-strings, or fallbacks)
-    const parseNum = v => {
-        if (v === undefined || v === null || v === '') return 0;
-        const n = Number(String(v).replace(/[^0-9.\-]/g, ''));
-        return isNaN(n) ? 0 : n;
-    };
-
-    const safeVotes = Array.isArray(sortedVotes) ? sortedVotes : [];
-    const dataPoints = safeVotes.map(v => parseNum(v?.pointsFinal ?? v?.points));
-    const labels = safeVotes.map(v => v?.songName ?? '');
-
-    console.log('Chart dataPoints sample (first 10):', dataPoints.slice(0, 10));
-    console.log('Chart labels sample (first 10):', labels.slice(0, 10));
-    console.log('Canvas offset size:', chartCanvas.offsetWidth, chartCanvas.offsetHeight, 'computed height:', window.getComputedStyle(chartCanvas).height);
-
-    // Use passed context if provided (handleWeeklySummaryUpdate passes ctx), otherwise get from canvas
-    const context = ctx || chartCanvas.getContext('2d');
-    if (!context) {
-        console.error('Unable to obtain 2D context for weekSummaryChart');
-        return;
-    }
-
-    // DEBUG: log sizing info and force-correct the canvas drawing buffer using devicePixelRatio.
-    try {
-        const dpr = window.devicePixelRatio || 1;
-        console.info('weekSummaryChart sizing debug', {
-            computedHeight: (typeof computed !== 'undefined' ? computed : null),
-            offsetWidth: chartCanvas.offsetWidth,
-            offsetHeight: chartCanvas.offsetHeight,
-            styleHeight: chartCanvas.style.height,
-            clientHeight: chartCanvas.clientHeight,
-            devicePixelRatio: dpr
-        });
-
-        // Ensure CSS width/height are set so layout gives us expected offsets
-        chartCanvas.style.width = chartCanvas.style.width || '100%';
-        chartCanvas.style.height = (typeof computed !== 'undefined') ? `${computed}px` : chartCanvas.style.height;
-
-        // Set the canvas internal pixel buffer size (width/height attributes) to CSS pixels * DPR
-        const cssWidth = chartCanvas.offsetWidth || chartCanvas.clientWidth || parseInt(getComputedStyle(chartCanvas).width, 10) || 800;
-        const cssHeight = (typeof computed !== 'undefined') ? computed : (chartCanvas.offsetHeight || chartCanvas.clientHeight || parseInt(getComputedStyle(chartCanvas).height, 10) || 600);
-
-        const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
-        const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr));
-
-        // Apply attributes and properties
-        chartCanvas.setAttribute('width', String(pixelWidth));
-        chartCanvas.setAttribute('height', String(pixelHeight));
-        chartCanvas.width = pixelWidth;
-        chartCanvas.height = pixelHeight;
-
-        // Inform Chart.js of the devicePixelRatio to avoid it re-scaling unexpectedly
-        if (window.Chart && window.Chart.defaults) {
-            window.Chart.defaults.devicePixelRatio = dpr;
-        }
-    } catch (e) {
-        console.warn('weekSummaryChart sizing adjustments failed', e);
-    }
-
-    // Create Chart.js instance with initial data (may be empty).
-    // We force a fixed drawing buffer and disable Chart.js responsive autosizing so the
-    // tall canvas we prepared is used as the drawing surface.
-    try {
-        // Compute visual parameters tuned for large lists
-        const totalItems = Array.isArray(sortedVotes) ? sortedVotes.length : labels.length;
-        const barThickness = Math.max(2, Math.floor(Math.max(2, (computed / Math.max(1, totalItems)))));
-        const fontSizeY = (totalItems > 300 ? 9 : (totalItems > 200 ? 10 : (totalItems > 100 ? 11 : 12)));
-
-        // Make horizontal scrolling available if labels are long
+        // Apply CSS and pixel sizing to canvas
+        chartCanvas.style.height = `${computed}px`;
         try {
-            const longestLabel = labels.reduce((a, b) => (a && a.length > b.length ? a : b), '');
-            const estimatedLabelWidth = Math.min(4000, Math.max(800, (longestLabel ? longestLabel.length : 20) * 8 + 200));
-            const chartContainerEl = chartCanvas.parentNode;
-            if (chartContainerEl && chartContainerEl.classList && chartContainerEl.classList.contains('chart-container')) {
-                chartContainerEl.style.overflowX = 'auto';
-                chartContainerEl.style.whiteSpace = 'nowrap';
+            const dpr = window.devicePixelRatio || 1;
+            const cssWidth = chartCanvas.offsetWidth || chartCanvas.clientWidth || parseInt(getComputedStyle(chartCanvas).width, 10) || 800;
+            const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
+            const pixelHeight = Math.max(1, Math.floor(computed * dpr));
+            chartCanvas.setAttribute('width', String(pixelWidth));
+            chartCanvas.setAttribute('height', String(pixelHeight));
+            chartCanvas.width = pixelWidth;
+            chartCanvas.height = pixelHeight;
+            if (window.Chart && window.Chart.defaults) {
+                window.Chart.defaults.devicePixelRatio = dpr;
             }
-            chartCanvas.style.minWidth = `${estimatedLabelWidth}px`;
         } catch (e) {
-            console.warn('Label width heuristic failed', e);
+            // ignore sizing hiccups
         }
 
-        // Ensure Chart.js treats canvas as fixed-size drawing buffer
-        if (window.Chart && window.Chart.defaults) {
-            window.Chart.defaults.responsive = false;
-            // leave devicePixelRatio already set earlier
+        // Destroy previous chart if exists
+        if (window.weekChart) {
+            try { window.weekChart.destroy(); } catch (e) { /* ignore */ }
+            window.weekChart = null;
         }
 
+        // Prepare data for page
+        const dataPoints = pageVotes.map(v => Number(v.pointsFinal ?? v.points ?? 0));
+        const labels = pageVotes.map(v => v.songName ?? '');
+
+        // Adjust visual parameters for page size
+        const fontSizeY = pageItemCount > 50 ? 11 : 12;
+        const barThickness = Math.max(4, Math.floor(computed / Math.max(1, pageItemCount)));
+
+        // Create Chart.js instance for this page
         window.weekChart = new Chart(chartCanvas, {
             type: 'bar',
             data: {
@@ -1209,31 +1211,30 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
                 }]
             },
             options: {
-                // disable internal responsive resizing; we manage canvas size explicitly
                 responsive: false,
                 maintainAspectRatio: false,
                 indexAxis: 'y',
-                animation: { duration: 300 },
+                animation: { duration: 200 },
                 layout: {
-                    padding: { left: 15, right: 15, top: 20, bottom: 20 }
+                    padding: { left: 15, right: 15, top: 10, bottom: 10 }
                 },
                 scales: {
                     y: {
                         ticks: { color: '#ffffff', font: { size: fontSizeY, weight: 'bold' }, padding: 6, autoSkip: false },
-                        grid: { color: 'rgba(255,255,255,.15)' }
+                        grid: { color: 'rgba(255,255,255,.08)' }
                     },
                     x: {
-                        ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' } },
-                        grid: { color: 'rgba(255,255,255,.15)' }
+                        ticks: { color: '#ffffff', font: { size: 12, weight: 'bold' } },
+                        grid: { color: 'rgba(255,255,255,.08)' }
                     }
                 },
                 plugins: {
                     legend: { display: false },
                     title: {
                         display: true,
-                        text: `${selectedWeek} Points Distribution`,
+                        text: `${selectedWeek} Points Distribution (items ${startIdx + 1}-${endIdx} of ${totalItems})`,
                         color: '#ffffff',
-                        font: { size: 18, weight: 'bold' }
+                        font: { size: 16, weight: 'bold' }
                     },
                     tooltip: {
                         enabled: true,
@@ -1243,68 +1244,28 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
                 }
             }
         });
-    } catch (e) {
-        console.error('Failed to create weekChart with forced sizing', e);
     }
 
-    // Immediately (synchronously) re-assign the chart data to ensure nothing in Chart.js
-    // runtime overwrites/clears it. Then force an update.
-    try {
-        if (window.weekChart) {
-            window.weekChart.data.labels = labels;
-            window.weekChart.data.datasets = [{
-                label: 'Total Points',
-                data: dataPoints,
-                backgroundColor: 'rgba(90, 30, 90, 0.95)',
-                borderColor: 'rgba(90, 30, 90, 1)',
-                borderWidth: 1
-            }];
-            window.weekChart.update();
-            console.log('Assigned chart.labels/data synchronously; lengths:', window.weekChart.data.labels.length, window.weekChart.data.datasets[0].data.length);
+    // Wire up controls
+    prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPage();
         }
-    } catch (e) {
-        console.warn('Synchronous chart assignment failed:', e);
-    }
-
-    // Defensive fallback: if Chart.js ended up with empty labels/data, set them explicitly and force an update.
-    try {
-        const hasEmptyData = (Array.isArray(window.weekChart.data.labels) && window.weekChart.data.labels.length === 0)
-            || (Array.isArray(window.weekChart.data.datasets?.[0]?.data) && window.weekChart.data.datasets[0].data.length === 0);
-
-        if (hasEmptyData && dataPoints.length > 0) {
-            console.warn('Chart initialized with empty data — applying fallback assignment and forcing update.');
-            window.weekChart.data.labels = labels;
-            if (!window.weekChart.data.datasets) window.weekChart.data.datasets = [{ label: 'Total Points', data: [] }];
-            window.weekChart.data.datasets[0].data = dataPoints;
-            // Ensure visible dataset
-            if (typeof window.weekChart.setDatasetVisibility === 'function') {
-                try { window.weekChart.setDatasetVisibility(0, true); } catch (e) {}
-            }
-            window.weekChart.update();
-            console.log('Fallback chart update applied. labels/data lengths:', window.weekChart.data.labels.length, window.weekChart.data.datasets[0].data.length);
-        } else {
-            window.weekChart.update();
+    });
+    nextBtn.addEventListener('click', () => {
+        const pages = Math.max(1, Math.ceil(totalItems / pageSize));
+        if (currentPage < pages) {
+            currentPage++;
+            renderPage();
         }
-    } catch (e) {
-        console.warn('chart.update() or fallback assignment failed:', e);
-    }
+    });
+    pageSizeSelect.addEventListener('change', (e) => {
+        pageSize = parseInt(e.target.value, 10) || DEFAULT_PAGE_SIZE;
+        currentPage = 1; // reset to first page
+        renderPage();
+    });
 
-    // Extra fallback: re-assign labels/data on the next tick if Chart.js clears them asynchronously.
-    setTimeout(() => {
-        if (!window.weekChart) return;
-        try {
-            const currentLabelsLen = Array.isArray(window.weekChart.data.labels) ? window.weekChart.data.labels.length : 0;
-            const currentDataLen = Array.isArray(window.weekChart.data.datasets?.[0]?.data) ? window.weekChart.data.datasets[0].data.length : 0;
-            if ((currentLabelsLen === 0 || currentDataLen === 0) && dataPoints.length > 0) {
-                console.warn('Applying setTimeout fallback to populate chart data');
-                window.weekChart.data.labels = labels;
-                if (!window.weekChart.data.datasets) window.weekChart.data.datasets = [{ label: 'Total Points', data: [] }];
-                window.weekChart.data.datasets[0].data = dataPoints;
-                try { window.weekChart.update(); } catch (e) { console.warn('setTimeout chart.update failed', e); }
-                console.log('setTimeout fallback applied. labels/data lengths now:', window.weekChart.data.labels.length, window.weekChart.data.datasets[0].data.length);
-            }
-        } catch (e) {
-            console.warn('setTimeout fallback failed:', e);
-        }
-    }, 50);
+    // Initial render
+    renderPage();
 }
