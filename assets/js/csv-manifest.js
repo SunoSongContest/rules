@@ -103,6 +103,8 @@ window.CSV_MANIFEST = {
                { id: 'second_chance', label: '2nd Chance', type: 'single', labelValue: '2nd Chance' },
                { id: 'finals', label: 'Finals', type: 'single', labelValue: 'Final' }
            ],
+           // Points in this edition's votes CSV already include bonus; do NOT add bonus again.
+           pointsRawIncludesBonus: true,
            // Edition-specific advancement rules for SSC7:
            // - For Group weeks (e.g., "Group A", "Group B") advance:
            //     * top 20 => Showcase (or marked "Showcase")
