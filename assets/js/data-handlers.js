@@ -1088,7 +1088,16 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         chartContainerEl.style.maxHeight = '80vh';
     }
 
+    // Set both CSS height and the canvas element's height attribute so Chart.js uses the intended
+    // drawing size (chart libraries often read the canvas height attribute or the actual pixel size).
     chartCanvas.style.height = `${computed}px`;
+    try {
+        chartCanvas.setAttribute('height', String(Math.floor(computed)));
+        chartCanvas.height = Math.floor(computed);
+    } catch (e) {
+        // Non-fatal: if setting attributes fails in some environments, continue.
+        console.warn('Unable to set canvas height attribute:', e);
+    }
 
     // Destroy previous chart instance if present
     if (window.weekChart) {
