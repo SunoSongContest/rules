@@ -1142,6 +1142,16 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
     let pageSize = DEFAULT_PAGE_SIZE;
     let currentPage = 1;
 
+    // Debounced resize: re-render current page when viewport changes (keeps chart responsive on mobile)
+    function debounce(fn, wait){ let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); }; }
+    const handleResize = debounce(() => { renderPage(); }, 250);
+
+    // Attach resize listener once
+    if (!window._ssc_week_summary_resize_attached) {
+        window.addEventListener('resize', handleResize);
+        window._ssc_week_summary_resize_attached = true;
+    }
+
     function renderPage() {
         // Validate page
         const pages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -1164,7 +1174,8 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         chartContainerEl.style.overflowY = 'auto';
         chartContainerEl.style.maxHeight = '80vh';
 
-        // Apply CSS and pixel sizing to canvas
+        // Keep canvas width responsive to container and apply CSS + pixel sizing
+        chartCanvas.style.width = '100%';
         chartCanvas.style.height = `${computed}px`;
         try {
             const dpr = window.devicePixelRatio || 1;
@@ -1193,9 +1204,13 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         const dataPoints = pageVotes.map(v => Number(v.pointsFinal ?? v.points ?? 0));
         const labels = pageVotes.map(v => v.songName ?? '');
 
-        // Adjust visual parameters for page size
-        const fontSizeY = pageItemCount > 50 ? 11 : 12;
-        const barThickness = Math.max(4, Math.floor(computed / Math.max(1, pageItemCount)));
+        // Adjust visual parameters for page size and container width (mobile friendly)
+        const containerWidth = chartContainerEl.clientWidth || 360;
+        // smaller fonts on narrow screens
+        const fontSizeY = containerWidth < 420 ? Math.max(9, Math.floor(12 - (pageItemCount / 80))) : (pageItemCount > 50 ? 11 : 12);
+        // thinner bars on narrow screens to keep spacing reasonable
+        const baseThickness = Math.floor(computed / Math.max(1, pageItemCount));
+        const barThickness = Math.max(2, Math.min(12, containerWidth < 420 ? Math.max(2, Math.floor(baseThickness * 0.6)) : Math.max(4, baseThickness)));
 
         // Create Chart.js instance for this page
         window.weekChart = new Chart(chartCanvas, {
