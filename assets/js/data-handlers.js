@@ -1076,9 +1076,18 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
     }
 
     // Compute chart height based on number of bars to avoid excessive blank space.
-    // Approx 40px per row + padding; clamp between 400px and 1200px.
+    // Approx 40px per row + padding; clamp between 400px and 5000px.
     const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
-    const computed = Math.max(400, Math.min(40 * itemCount + 200, 1200));
+    const computed = Math.max(400, Math.min(40 * itemCount + 200, 5000));
+
+    // Ensure the parent chart container becomes scrollable for very tall charts so the page doesn't
+    // grow unbounded while still allowing the chart to render at a readable height.
+    const chartContainerEl = chartCanvas.parentNode;
+    if (chartContainerEl && chartContainerEl.classList && chartContainerEl.classList.contains('chart-container')) {
+        chartContainerEl.style.overflowY = 'auto';
+        chartContainerEl.style.maxHeight = '80vh';
+    }
+
     chartCanvas.style.height = `${computed}px`;
 
     // Destroy previous chart instance if present
