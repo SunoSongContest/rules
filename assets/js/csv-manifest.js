@@ -1,4 +1,4 @@
-/*
+s /*
  CSV_MANIFEST
 
  Extended manifest / edition-config schema to support multiple SSC editions

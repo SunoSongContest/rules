@@ -564,10 +564,13 @@ function parseVotesCSV(csv, editionConfig = {}) {
         const weeklyRank = getByIndexOrName('weeklyRank') ?? '';
         const resultFlag = (getByIndexOrName('result') || '').toString().trim();
 
-        const pointsRaw = parseNum(pointsRawStr);
-
-        // Bonus handling (auto-detected). Honor editionConfig.pointsRawIncludesBonus when present.
-        const pointsRawIncludesBonus = Boolean(editionConfig && editionConfig.pointsRawIncludesBonus);
+        // Determine displayed points from CSV and parse bonus column.
+        // The manifest flag `pointsRawIncludesBonus` indicates whether the CSV "points"
+        // column already includes bonus points. When true we should display that value
+        // as the total and not add the bonus again.
+        const displayedCandidate = parseNum(getByIndexOrName('points') ?? getByIndexOrName('pointsRaw') ?? '0');
+ 
+        // Bonus handling (auto-detected).
         let bonusPoints = 0;
         let bonusColumnIndex = undefined;
         if (typeof colMap.bonusPoints === 'number') {
@@ -580,8 +583,14 @@ function parseVotesCSV(csv, editionConfig = {}) {
             bonusPoints = parseNum(values[bonusColumnIndex]);
         }
  
-        // If pointsRaw already includes bonus (per manifest), do not add bonusPoints again.
-        const pointsFinal = pointsRawIncludesBonus ? pointsRaw : pointsRaw + (bonusPoints || 0);
+        const pointsRawIncludesBonus = Boolean(editionConfig && editionConfig.pointsRawIncludesBonus);
+        // Compute the displayed/ final points according to manifest:
+        // - if CSV points already include bonus, use that value as final
+        // - otherwise add bonus to the CSV points to compute final
+        const pointsDisplayed = pointsRawIncludesBonus ? displayedCandidate : (displayedCandidate + bonusPoints);
+        const pointsFinal = pointsDisplayed;
+        // Keep pointsRaw as the displayed total (for UI expectations)
+        const pointsRaw = pointsDisplayed;
 
         const canonical = {
             id: String(id),
