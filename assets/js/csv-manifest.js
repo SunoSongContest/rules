@@ -1,5 +1,5 @@
-s /*
- CSV_MANIFEST
+/*
+  CSV_MANIFEST
 
  Extended manifest / edition-config schema to support multiple SSC editions
  and provide metadata needed by the normalization + advancement layer.
