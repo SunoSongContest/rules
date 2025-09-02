@@ -13,12 +13,15 @@ function updateChart(songData) {
         parseInt(songData.votes1)
     ];
 
-    if (chart) {
-        chart.destroy();
+    // Use a dedicated chart instance for the single-song vote distribution so it doesn't
+    // interfere with the weekly summary chart instance.
+    if (window.songChart) {
+        try { window.songChart.destroy(); } catch (e) { /* ignore destroy errors */ }
+        window.songChart = null;
     }
-
+    
     const ctx = document.getElementById('votesChart').getContext('2d');
-    chart = new Chart(ctx, {
+    window.songChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: [12, 10, 8, 7, 6, 5, 4, 3, 2, 1],
@@ -357,20 +360,19 @@ function updateWeeklySummary() {
     });
     
     // Destroy existing chart before creating new one
-    if (window.chart) {
-        try { window.chart.destroy(); } catch (e) { /* ignore */ }
+    if (window.weekChart) {
+        try { window.weekChart.destroy(); } catch (e) { /* ignore */ }
+        window.weekChart = null;
     }
     
     updatePodium(weekVotes);
     
     // Reset chart size before updating
     const chartCanvas = document.getElementById('weekSummaryChart');
-    if (chartCanvas) if (chartCanvas) {
-        // Compute chart height based on number of bars to avoid excessive blank space.
-        // Approx 40px per row + padding; clamp between 400px and 1200px.
-        const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
-        const computed = Math.max(400, Math.min(40 * itemCount + 200, 1200));
-        chartCanvas.style.height = `${computed}px`;
+    if (chartCanvas) {
+        // Clear any explicit height so Chart.js can recompute natural layout.
+        // Actual height will be computed after we know the number of bars (sortedVotes).
+        chartCanvas.style.height = '';
     }
     
     const sortedVotes = [...weekVotes].sort((a, b) => {
@@ -379,13 +381,20 @@ function updateWeeklySummary() {
         return pb - pa;
     });
     
+    // Now that we know how many items will be displayed, compute chart height to avoid large blank areas.
+    if (chartCanvas) {
+        const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
+        const computed = Math.max(400, Math.min(40 * itemCount + 200, 1200));
+        chartCanvas.style.height = `${computed}px`;
+    }
+    
     const ctx = chartCanvas ? chartCanvas.getContext('2d') : null;
     if (!ctx) {
         console.error('updateWeeklySummary: canvas/context not available');
         return;
     }
     
-    window.chart = new Chart(ctx, {
+    window.weekChart = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: sortedVotes.map(v => v.songName),
