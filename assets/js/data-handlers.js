@@ -1075,8 +1075,8 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         return;
     }
 
-    // Pagination configuration
-    const DEFAULT_PAGE_SIZE = 25;
+    // Pagination configuration (default 40 rows per page for readability)
+    const DEFAULT_PAGE_SIZE = 40;
     const totalItems = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
     const totalPages = Math.max(1, Math.ceil(totalItems / DEFAULT_PAGE_SIZE));
 
@@ -1118,7 +1118,7 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
     pageSizeLabel.textContent = ' per page: ';
 
     const pageSizeSelect = document.createElement('select');
-    [10, 25, 50, 100].forEach(n => {
+    [10, 25, 40, 50, 100].forEach(n => {
         const opt = document.createElement('option');
         opt.value = String(n);
         opt.textContent = String(n);
@@ -1168,7 +1168,8 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         chartCanvas.style.height = `${computed}px`;
         try {
             const dpr = window.devicePixelRatio || 1;
-            const cssWidth = chartCanvas.offsetWidth || chartCanvas.clientWidth || parseInt(getComputedStyle(chartCanvas).width, 10) || 800;
+            // Use the container width to keep visible width stable when changing page size
+            const cssWidth = (chartContainerEl && chartContainerEl.clientWidth) ? chartContainerEl.clientWidth : (chartCanvas.clientWidth || parseInt(getComputedStyle(chartCanvas).width, 10) || 800);
             const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
             const pixelHeight = Math.max(1, Math.floor(computed * dpr));
             chartCanvas.setAttribute('width', String(pixelWidth));
