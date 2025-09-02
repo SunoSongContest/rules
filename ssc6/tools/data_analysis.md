@@ -684,7 +684,8 @@ tag: tool
 </script>
 <!-- Add manifest before other scripts -->
 <script src="{{ "/assets/js/csv-manifest.js" | prepend: site.baseurl }}"></script>
-<script src="{{ "/assets/js/core.js" | prepend: site.baseurl }}"></script><script src="{{ "/assets/js/data-handlers.js" | prepend: site.baseurl }}"></script>
+<script src="{{ "/assets/js/core.js" | prepend: site.baseurl }}"></script>
+<script src="{{ "/assets/js/data-handlers.js" | prepend: site.baseurl }}"></script>
 <script src="{{ "/assets/js/ui-handlers.js" | prepend: site.baseurl }}"></script>
 <script src="{{ "/assets/js/visualization.js" | prepend: site.baseurl }}"></script>
-<script src="{{ "/assets/js/podium.js" | prepend: site.baseurl }}"></script></script><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="{{ "/assets/js/podium.js" | prepend: site.baseurl }}"></script>

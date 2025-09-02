@@ -172,21 +172,9 @@ async function updateVisualization() {
     // Get song ID from URL
     const songId = getSongIdFromUrl(submissionData.songUrl);
 
-    // Fetch additional song info including image
-    if (songId) {
-        const songInfo = await getSongInfo(songId);
-        if (songInfo) {
-            const imgElement = document.createElement('img');
-            imgElement.src = songInfo.imageUrl;
-            imgElement.style.width = '100%';
-            imgElement.style.height = 'auto';
-            imgElement.style.borderRadius = '8px';
-            imgElement.style.marginBottom = '15px';
-            imgElement.style.objectFit = 'cover';
-
-            document.querySelector('.song-group').insertBefore(imgElement, document.querySelector('.song-card'));
-        }
-    }
+    // Image insertion is handled centrally by updateAudioPlayer() in data-handlers.js
+    // to avoid duplicate cover art. visualization.updateVisualization only manages the chart,
+    // audio player and stats; it relies on updateAudioPlayer to manage the cover image.
 
     // Create or update audio player
     let audioPlayer = document.getElementById('songPlayer');
