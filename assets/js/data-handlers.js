@@ -435,7 +435,19 @@ function findSubmissionBySongName(songName) {
 
 // Expose helper globally so other modules can use it
 window.findSubmissionBySongName = findSubmissionBySongName;
-
+ 
+/* Helper: normalize stage labels (groups/weeks) for matching/options.
+   Strips bracketed/parenthesized fragments, collapses whitespace, lowercases. */
+function normalizeStageLabel(s) {
+    if (!s && s !== 0) return '';
+    let t = String(s || '').trim();
+    t = t.replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
+    t = t.replace(/\s*\[[^\]]*\]\s*$/g, '');
+    t = t.replace(/\s*\([^\)]*\)\s*$/g, '');
+    t = t.replace(/\s+/g, ' ').trim().toLowerCase();
+    return t;
+}
+ 
 function parseVotesCSV(csv, editionConfig = {}) {
     // Use robust CSV parsing to avoid splitting on commas inside quoted fields.
     const parsed = parseCSV(csv);
@@ -647,7 +659,12 @@ function updateSongSelect() {
     songSelect.innerHTML = '<option value="">Select Song</option>';
 
     if (selectedWeek && window.votes) {
-        const weekSongs = window.votes.filter(s => String(s.stage) === String(selectedWeek));
+        const weekSongs = window.votes.filter(s => {
+            const ns = normalizeStageLabel(s.stage) || normalizeStageLabel(s.week) || normalizeStageLabel(s.stageLabel);
+            const nr = normalizeStageLabel(s.result);
+            const target = normalizeStageLabel(selectedWeek);
+            return ns === target || nr === target;
+        });
         console.log('Filtered songs for week:', weekSongs);
         
         weekSongs.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
@@ -672,7 +689,12 @@ function initializeWeekListeners() {
     // Song votes view listener
     weekSelect.addEventListener('change', (e) => {
         console.log('Week selection changed:', e.target.value);
-        const weekSongs = window.votes.filter(v => v.stage === e.target.value);
+        const target = normalizeStageLabel(e.target.value);
+        const weekSongs = window.votes.filter(v => {
+            const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
+            const nr = normalizeStageLabel(v.result);
+            return ns === target || nr === target;
+        });
         console.log('Found songs:', weekSongs.length, weekSongs);
         
         const songSelect = document.getElementById('songSelect');
@@ -694,7 +716,12 @@ function initializeWeekListeners() {
         console.log('Summary week changed:', selectedWeek);
         
         if (selectedWeek && window.votes) {
-            const weekVotes = window.votes.filter(v => String(v.stage) === String(selectedWeek));
+            const target = normalizeStageLabel(selectedWeek);
+            const weekVotes = window.votes.filter(v => {
+                const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
+                const nr = normalizeStageLabel(v.result);
+                return ns === target || nr === target;
+            });
             console.log('Found votes for summary:', weekVotes.length, weekVotes);
             
             // Update podium and chart in a single call
@@ -1011,7 +1038,12 @@ function updateWeeklySummary(selectedWeek) {
     podiumSection.style.display = selectedWeek ? 'block' : 'none';
     
     if (selectedWeek && window.votes) {
-        const weekVotes = window.votes.filter(v => String(v.stage) === String(selectedWeek));
+        const target = normalizeStageLabel(selectedWeek);
+        const weekVotes = window.votes.filter(v => {
+            const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
+            const nr = normalizeStageLabel(v.result);
+            return ns === target || nr === target;
+        });
         console.log('Processing votes for weekly summary:', weekVotes.length);
         
         handleWeeklySummaryUpdate(weekVotes, selectedWeek);
