@@ -1129,6 +1129,43 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         return;
     }
 
+    // DEBUG: log sizing info and force-correct the canvas drawing buffer using devicePixelRatio.
+    try {
+        const dpr = window.devicePixelRatio || 1;
+        console.info('weekSummaryChart sizing debug', {
+            computedHeight: (typeof computed !== 'undefined' ? computed : null),
+            offsetWidth: chartCanvas.offsetWidth,
+            offsetHeight: chartCanvas.offsetHeight,
+            styleHeight: chartCanvas.style.height,
+            clientHeight: chartCanvas.clientHeight,
+            devicePixelRatio: dpr
+        });
+
+        // Ensure CSS width/height are set so layout gives us expected offsets
+        chartCanvas.style.width = chartCanvas.style.width || '100%';
+        chartCanvas.style.height = (typeof computed !== 'undefined') ? `${computed}px` : chartCanvas.style.height;
+
+        // Set the canvas internal pixel buffer size (width/height attributes) to CSS pixels * DPR
+        const cssWidth = chartCanvas.offsetWidth || chartCanvas.clientWidth || parseInt(getComputedStyle(chartCanvas).width, 10) || 800;
+        const cssHeight = (typeof computed !== 'undefined') ? computed : (chartCanvas.offsetHeight || chartCanvas.clientHeight || parseInt(getComputedStyle(chartCanvas).height, 10) || 600);
+
+        const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
+        const pixelHeight = Math.max(1, Math.floor(cssHeight * dpr));
+
+        // Apply attributes and properties
+        chartCanvas.setAttribute('width', String(pixelWidth));
+        chartCanvas.setAttribute('height', String(pixelHeight));
+        chartCanvas.width = pixelWidth;
+        chartCanvas.height = pixelHeight;
+
+        // Inform Chart.js of the devicePixelRatio to avoid it re-scaling unexpectedly
+        if (window.Chart && window.Chart.defaults) {
+            window.Chart.defaults.devicePixelRatio = dpr;
+        }
+    } catch (e) {
+        console.warn('weekSummaryChart sizing adjustments failed', e);
+    }
+
     // Create Chart.js instance with initial data (may be empty).
     // Use the canvas element itself as the first argument (some Chart.js builds
     // perform better when given the element instead of a 2D context).
