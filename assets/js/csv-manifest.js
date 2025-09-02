@@ -79,7 +79,7 @@ window.CSV_MANIFEST = {
            // Ordered stages help the UI present weeks/stages in the intended order.
            orderedStages: [
                { id: 'bunk', label: 'Bunk Week', type: 'bunk', groups: 10, groupPrefix: 'Group ' },
-               { id: 'showcase', label: 'Showcase Weeks', type: 'sequential', weeks: 5, weekPrefix: 'Showcase ' },
+               { id: 'showcase', label: 'Showcase Weeks', type: 'sequential', weeks: 5, weekPrefix: 'Week ' },
                { id: 'tracksave', label: 'Track Save', type: 'single', labelValue: 'Track Save Week' },
                { id: 'second_chance', label: '2nd Chance', type: 'single', labelValue: '2nd-chance' },
                { id: 'finals', label: 'Finals', type: 'single', labelValue: 'Finals' }
