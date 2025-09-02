@@ -725,26 +725,26 @@ function getWeeksFromVotes(votesData, editionConfig = {}) {
     };
 
     const stages = [...new Set(raw.map(cleanLabel).filter(Boolean))];
-
+ 
     // Separate numeric and non-numeric
     const numeric = stages
         .filter(s => !isNaN(s))
         .map(Number)
         .sort((a, b) => a - b)
         .map(String);
-
+ 
     const alphas = stages.filter(s => isNaN(s));
-
+ 
     // Preferred ordering heuristics for alpha labels
     const bunkRegex = /^bunk\s*([A-Za-z0-9]+)$/i;
     const showcaseRegex = /showcase\s*(\d+)/i;
-
+ 
     const bunks = alphas.filter(s => bunkRegex.test(s)).sort((a, b) => {
         const ma = (a.match(bunkRegex) || [null, a])[1].toString().toUpperCase();
         const mb = (b.match(bunkRegex) || [null, b])[1].toString().toUpperCase();
         return ma.localeCompare(mb);
     });
-
+ 
     const showcases = alphas.filter(s => showcaseRegex.test(s)).sort((a, b) => {
         const ma = a.match(showcaseRegex);
         const mb = b.match(showcaseRegex);
@@ -752,17 +752,61 @@ function getWeeksFromVotes(votesData, editionConfig = {}) {
         const nb = mb ? parseInt(mb[1], 10) : 0;
         return na - nb;
     });
-
+ 
     const trackSaves = alphas.filter(s => /track\s*save/i.test(s) || /tracksave/i.test(s));
     const secondChances = alphas.filter(s => /2nd|second\s*chance|2nd-?chance/i.test(s));
     const finals = alphas.filter(s => /final/i.test(s));
-
-    const prioritized = [...bunks, ...showcases, ...trackSaves, ...secondChances, ...finals];
-
-    // Remaining labels not matched above
-    const remaining = alphas.filter(s => !prioritized.includes(s)).sort();
-
-    return [...numeric, ...prioritized, ...remaining];
+ 
+    // If editionConfig provides an orderedStages array, use it to generate the alpha ordering.
+    if (editionConfig && Array.isArray(editionConfig.orderedStages) && editionConfig.orderedStages.length > 0) {
+        const obsSet = new Set(alphas.map(a => a.toLowerCase()));
+        const ordered = [];
+ 
+        const normalizeForMatch = (s) => String(s || '').trim().toLowerCase();
+ 
+        for (const entry of editionConfig.orderedStages) {
+            if (!entry || !entry.type) continue;
+            if (entry.type === 'bunk') {
+                const groups = entry.groups || 0;
+                const prefix = entry.groupPrefix || 'Group ';
+                for (let i = 0; i < groups; i++) {
+                    const label = `${prefix}${String.fromCharCode(65 + i)}`; // A,B,C...
+                    if (obsSet.has(normalizeForMatch(label))) ordered.push(label);
+                }
+            } else if (entry.type === 'sequential') {
+                const weeksCount = entry.weeks || 0;
+                const prefix = entry.weekPrefix || (entry.label || 'Showcase ');
+                for (let i = 1; i <= weeksCount; i++) {
+                    const label = `${prefix}${i}`;
+                    if (obsSet.has(normalizeForMatch(label))) ordered.push(label);
+                }
+            } else if (entry.type === 'single') {
+                const label = entry.labelValue || entry.label || (entry.id || '');
+                if (label && obsSet.has(normalizeForMatch(label))) ordered.push(label);
+            } else {
+                // Fallback: treat entry.label as literal
+                const label = entry.label || '';
+                if (label && obsSet.has(normalizeForMatch(label))) ordered.push(label);
+            }
+        }
+ 
+        // Remaining alpha labels not covered by manifest ordering
+        const remaining = alphas.filter(s => !ordered.map(x => normalizeForMatch(x)).includes(normalizeForMatch(s))).sort();
+ 
+        // Final order: numeric weeks + manifest ordered alphas + remaining
+        return [...numeric, ...ordered, ...remaining];
+    }
+ 
+    // Default fallback ordering (when no manifest ordering provided):
+    // Keep bunks/showcases near the top, then remaining labels, then track-save / 2nd-chance / finals
+    const prioritizedStart = [...bunks, ...showcases];
+    const tail = [...trackSaves, ...secondChances, ...finals];
+ 
+    // Remaining labels not matched above (exclude both prioritizedStart and tail)
+    const remaining = alphas.filter(s => ![...prioritizedStart, ...tail].includes(s)).sort();
+ 
+    // Final order: numeric weeks, bunks/showcases, remaining labels, then track-save / 2nd-chance / finals
+    return [...numeric, ...prioritizedStart, ...remaining, ...tail];
 }
 
 function initializeSelects(weeks) {

@@ -365,7 +365,13 @@ function updateWeeklySummary() {
     
     // Reset chart size before updating
     const chartCanvas = document.getElementById('weekSummaryChart');
-    if (chartCanvas) chartCanvas.style.height = '1200px';
+    if (chartCanvas) if (chartCanvas) {
+        // Compute chart height based on number of bars to avoid excessive blank space.
+        // Approx 40px per row + padding; clamp between 400px and 1200px.
+        const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
+        const computed = Math.max(400, Math.min(40 * itemCount + 200, 1200));
+        chartCanvas.style.height = `${computed}px`;
+    }
     
     const sortedVotes = [...weekVotes].sort((a, b) => {
         const pa = Number(a.pointsFinal ?? a.points ?? 0);
