@@ -159,9 +159,11 @@ async function updatePodium(weekVotes) {
             usedSecondChance = sortedSongs.slice(20, 40);
         }
     } else {
-        // Non-group handling: prefer explicit flags, otherwise derive legacy top-5 + 6-10
+        // Non-group handling: prefer explicit flags.
+        // IMPORTANT: Do NOT automatically derive ranks 6-10 as "Second Chance" when the CSV
+        // does not include explicit result flags. Only show explicit Second Chance entries.
         usedFinalists = finalists.length > 0 ? finalists : maybeDeriveFinalists();
-        usedSecondChance = secondChance.length > 0 ? secondChance : sortedSongs.slice(5, 10);
+        usedSecondChance = secondChance.length > 0 ? secondChance : [];
     }
     
     console.log('Regular week songs:', { usedFinalistsCount: usedFinalists.length, usedSecondChanceCount: usedSecondChance.length, isGroupStage });
