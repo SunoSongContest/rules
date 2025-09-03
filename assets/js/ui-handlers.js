@@ -135,19 +135,33 @@ function initializeSelects(weeks) {
 function updateSongSelect() {
     const weekSelect = document.getElementById('weekSelect');
     const songSelect = document.getElementById('songSelect');
-    const selectedWeek = weekSelect.value;
+    const selectedWeek = weekSelect ? weekSelect.value : '';
 
+    console.log('UI-handlers.updateSongSelect called for week:', selectedWeek);
     songSelect.innerHTML = '<option value="">Select Song</option>';
 
-    if (selectedWeek && window.votes) {
-        const weekSongs = window.votes.filter(s => String(s.stage) === String(selectedWeek) && parseInt(s.pointsFinal) > 0);
-        
-        weekSongs.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
-        
+    if (selectedWeek && Array.isArray(window.votes)) {
+        // Use the same normalization routine as data-handlers to avoid mismatched labels
+        // (normalizeStageLabel is defined in data-handlers.js and available globally).
+        const target = (typeof normalizeStageLabel === 'function') ? normalizeStageLabel(selectedWeek) : String(selectedWeek).trim().toLowerCase();
+
+        const weekSongs = window.votes.filter(s => {
+            const ns = (typeof normalizeStageLabel === 'function')
+                ? (normalizeStageLabel(s.stage) || normalizeStageLabel(s.week) || normalizeStageLabel(s.stageLabel))
+                : ((String(s.stage || s.week || s.stageLabel || '')).trim().toLowerCase());
+            // Ensure we only include songs that actually belong to the selected normalized stage
+            // and have a positive pointsFinal value.
+            return ns === target && Number(s.pointsFinal || s.points || 0) > 0;
+        });
+
+        console.log('UI-handlers.filtered weekSongs count:', weekSongs.length);
+
+        weekSongs.sort((a, b) => Number(b.pointsFinal || b.points || 0) - Number(a.pointsFinal || a.points || 0));
+
         weekSongs.forEach(song => {
             const option = document.createElement('option');
             option.value = song.songName;
-            option.textContent = `${song.songName} (${song.pointsFinal} points)`;
+            option.textContent = `${song.songName} (${song.pointsFinal || song.points || 0} points)`;
             songSelect.appendChild(option);
         });
     }

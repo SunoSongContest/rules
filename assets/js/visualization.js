@@ -153,16 +153,32 @@ async function updateVisualization() {
     const existingImg = document.querySelector('.song-group img');
     if (existingImg) existingImg.remove();
 
-    // Find song by name and stage/week (support both legacy 'week' and new 'stage' field)
-    const songData = window.votes.find(v =>
-        v.songName === selectedSong &&
-        (String(v.stage) === String(selectedWeek) || String(v.week) === String(selectedWeek))
-    );
-    
-    const submissionData = (typeof window.findSubmissionBySongName === 'function')
-        ? window.findSubmissionBySongName(songData && songData.songName)
-        : ((window.submissions || []).find(s => s.songTitle === (songData && songData.songName)) || undefined);
-    
+    // Find song by name and stage/week using normalized stage labels to avoid casing/format mismatches.
+    const target = (typeof normalizeStageLabel === 'function') ? normalizeStageLabel(selectedWeek) : String(selectedWeek || '').trim().toLowerCase();
+    let songData = undefined;
+    if (Array.isArray(window.votes)) {
+        songData = window.votes.find(v => {
+            const ns = (typeof normalizeStageLabel === 'function')
+                ? (normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel))
+                : ((String(v.stage || v.week || v.stageLabel || '')).trim().toLowerCase());
+            return (v.songName === selectedSong) && (ns === target);
+        });
+    }
+
+    // Resolve submission data using the robust helper if available, otherwise fall back to a normalized title match.
+    let submissionData = undefined;
+    if (typeof window.findSubmissionBySongName === 'function') {
+        submissionData = window.findSubmissionBySongName(songData && songData.songName);
+    }
+    if (!submissionData && Array.isArray(window.submissions) && songData && songData.songName) {
+        // Fallback: match normalized songTitle from submissions list.
+        const needle = (typeof normalizeSongTitle === 'function') ? normalizeSongTitle(songData.songName) : String(songData.songName).trim().toLowerCase();
+        submissionData = window.submissions.find(s => {
+            const title = (typeof normalizeSongTitle === 'function') ? normalizeSongTitle(s.songTitle) : String(s.songTitle || '').trim().toLowerCase();
+            return title === needle;
+        });
+    }
+
     if (!songData || !submissionData) {
         console.warn('Song or submission data not found for selection:', selectedSong, selectedWeek);
         if (statsContainer) statsContainer.style.display = 'none';
@@ -368,19 +384,10 @@ function updateWeeklySummary() {
     if (chartCanvas) {
         // Clear any explicit height so Chart.js can recompute natural layout.
         chartCanvas.style.height = '';
-
-        // Ensure the parent chart container becomes scrollable for very tall charts so the page doesn't
-        // grow unbounded while still allowing the chart to render at a readable height.
-        const chartContainerEl = chartCanvas.parentNode;
-        if (chartContainerEl && chartContainerEl.classList && chartContainerEl.classList.contains('chart-container')) {
-            chartContainerEl.style.overflowY = 'auto';
-            chartContainerEl.style.maxHeight = '80vh';
-        }
-
         // Compute chart height based on number of bars to avoid excessive blank space.
-        // Approx 40px per row + padding; clamp between 400px and 5000px.
+        // Approx 40px per row + padding; clamp between 400px and 1200px.
         const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
-        const computed = Math.max(400, Math.min(40 * itemCount + 200, 5000));
+        const computed = Math.max(400, Math.min(40 * itemCount + 200, 1200));
         chartCanvas.style.height = `${computed}px`;
     }
     
