@@ -1048,22 +1048,163 @@ function updateWeeklySummary(selectedWeek) {
 }
 
 function handleWeeklySummaryUpdate(weekVotes, selectedWeek) {
-    // Clear previous chart
-    if (window.weekChart) {
-        window.weekChart.destroy();
-        window.weekChart = null;
-    }
-    
-    // Sort votes once
-    const sortedVotes = weekVotes.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
-    console.log('Sorted votes for display:', sortedVotes);
-    
-    // Single call to update podium
+    // Defensive: ensure array and stable sort
+    const safeVotes = Array.isArray(weekVotes) ? [...weekVotes] : [];
+    const sortedVotes = safeVotes.sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal));
+    console.log('Sorted votes for display (total):', sortedVotes.length);
+
+    // Update podium with full sorted list
     updatePodium(sortedVotes);
-    
-    // Create new chart
-    const ctx = document.getElementById('weekSummaryChart').getContext('2d');
-    updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx);
+
+    // Initialize pagination state (persisted on window)
+    window.weekSummaryPagination = window.weekSummaryPagination || {};
+    window.weekSummaryPagination.votes = sortedVotes;
+    window.weekSummaryPagination.selectedWeek = selectedWeek;
+    window.weekSummaryPagination.perPage = window.weekSummaryPagination.perPage || 40; // default 40 per page
+    window.weekSummaryPagination.page = 1;
+
+    // Render pagination controls and show first page
+    renderSummaryPaginationControls();
+    renderSummaryPage();
+}
+
+/**
+ * Render pagination controls (per-page select, prev/next, page indicator).
+ * Inserts controls into #weekly-summary-view above the chart container.
+ */
+function renderSummaryPaginationControls() {
+    const container = document.getElementById('weekly-summary-view');
+    if (!container) return;
+
+    let controls = document.getElementById('summaryPaginationControls');
+    if (!controls) {
+        controls = document.createElement('div');
+        controls.id = 'summaryPaginationControls';
+        controls.style.display = 'flex';
+        controls.style.alignItems = 'center';
+        controls.style.gap = '8px';
+        controls.style.margin = '10px 0';
+        controls.style.flexWrap = 'wrap';
+        // Insert before chart container
+        const chartContainer = container.querySelector('.chart-container');
+        if (chartContainer && chartContainer.parentNode) {
+            chartContainer.parentNode.insertBefore(controls, chartContainer);
+        } else {
+            container.insertBefore(controls, container.firstChild);
+        }
+    } else {
+        controls.innerHTML = '';
+    }
+
+    // Per-page select
+    const perPageLabel = document.createElement('label');
+    perPageLabel.textContent = 'Rows per page:';
+    perPageLabel.style.color = 'var(--text-color)';
+    perPageLabel.style.marginRight = '6px';
+
+    const perPageSelect = document.createElement('select');
+    perPageSelect.id = 'perPageSelect';
+    [10, 20, 40, 80].forEach(n => {
+        const o = document.createElement('option');
+        o.value = String(n);
+        o.textContent = String(n);
+        perPageSelect.appendChild(o);
+    });
+    perPageSelect.value = String(window.weekSummaryPagination.perPage || 40);
+    perPageSelect.addEventListener('change', (e) => {
+        const val = parseInt(e.target.value, 10) || 40;
+        window.weekSummaryPagination.perPage = val;
+        window.weekSummaryPagination.page = 1;
+        renderSummaryPage();
+    });
+
+    controls.appendChild(perPageLabel);
+    controls.appendChild(perPageSelect);
+
+    // Prev button
+    const prevBtn = document.createElement('button');
+    prevBtn.id = 'summaryPrevBtn';
+    prevBtn.textContent = '◀ Prev';
+    prevBtn.style.cursor = 'pointer';
+    prevBtn.addEventListener('click', () => {
+        const state = window.weekSummaryPagination;
+        if (!state) return;
+        if (state.page > 1) {
+            state.page -= 1;
+            renderSummaryPage();
+        }
+    });
+    controls.appendChild(prevBtn);
+
+    // Page indicator
+    const pageIndicator = document.createElement('span');
+    pageIndicator.id = 'summaryPageIndicator';
+    pageIndicator.style.minWidth = '160px';
+    pageIndicator.style.textAlign = 'center';
+    pageIndicator.style.color = 'var(--text-color)';
+    controls.appendChild(pageIndicator);
+
+    // Next button
+    const nextBtn = document.createElement('button');
+    nextBtn.id = 'summaryNextBtn';
+    nextBtn.textContent = 'Next ▶';
+    nextBtn.style.cursor = 'pointer';
+    nextBtn.addEventListener('click', () => {
+        const state = window.weekSummaryPagination;
+        if (!state) return;
+        const totalPages = Math.max(1, Math.ceil((state.votes ? state.votes.length : 0) / (state.perPage || 40)));
+        if (state.page < totalPages) {
+            state.page += 1;
+            renderSummaryPage();
+        }
+    });
+    controls.appendChild(nextBtn);
+}
+
+/**
+ * Render the currently selected page and update the chart.
+ */
+function renderSummaryPage() {
+    const state = window.weekSummaryPagination;
+    if (!state || !Array.isArray(state.votes)) return;
+
+    const totalItems = state.votes.length;
+    const perPage = Number(state.perPage) || 40;
+    const totalPages = Math.max(1, Math.ceil(totalItems / perPage));
+    state.totalPages = totalPages;
+
+    // clamp page
+    if (!state.page || state.page < 1) state.page = 1;
+    if (state.page > totalPages) state.page = totalPages;
+
+    const start = (state.page - 1) * perPage;
+    const end = start + perPage;
+    const pageVotes = state.votes.slice(start, end);
+
+    console.log(`Rendering summary page ${state.page}/${totalPages} (items ${start + 1}-${Math.min(end, totalItems)} of ${totalItems})`);
+
+    // Update page indicator text
+    const indicator = document.getElementById('summaryPageIndicator');
+    if (indicator) {
+        indicator.textContent = `Page ${state.page} of ${totalPages} — showing ${pageVotes.length} of ${totalItems} songs`;
+    }
+
+    // Update prev/next button disabled state
+    const prevBtn = document.getElementById('summaryPrevBtn');
+    const nextBtn = document.getElementById('summaryNextBtn');
+    if (prevBtn) prevBtn.disabled = (state.page <= 1);
+    if (nextBtn) nextBtn.disabled = (state.page >= totalPages);
+
+    // Update chart using the page slice
+    const canvas = document.getElementById('weekSummaryChart');
+    if (!canvas) {
+        console.error('renderSummaryPage: weekSummaryChart canvas not found');
+        return;
+    }
+    const ctx = canvas.getContext('2d');
+
+    // Delegate to existing updateWeeklySummaryChart which will size the canvas and create/update the chart.
+    updateWeeklySummaryChart(pageVotes, state.selectedWeek, ctx);
 }
 
 // Make updateWeeklySummary globally availablewindow.updateWeeklySummary = updateWeeklySummary;window.updateWeeklySummary = updateWeeklySummary;
@@ -1075,213 +1216,147 @@ function updateWeeklySummaryChart(sortedVotes, selectedWeek, ctx) {
         return;
     }
 
-    // Pagination configuration (default 40 rows per page for readability)
-    const DEFAULT_PAGE_SIZE = 40;
-    const totalItems = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
-    const totalPages = Math.max(1, Math.ceil(totalItems / DEFAULT_PAGE_SIZE));
+    // Compute chart height based on number of bars to avoid excessive blank space.
+    // Approx 40px per row + padding; clamp between 400px and 4000px (supports large pages).
+    const itemCount = Array.isArray(sortedVotes) ? sortedVotes.length : 0;
+    const computed = Math.max(400, Math.min(40 * itemCount + 200, 4000));
+    chartCanvas.style.height = `${computed}px`;
 
-    // Ensure the chart container exists
-    const chartContainerEl = chartCanvas.parentNode;
-    if (!chartContainerEl) return;
-
-    // Remove any previous pagination controls
-    const existingControls = document.getElementById('weekSummaryPagination');
-    if (existingControls) existingControls.remove();
-
-    // Create pagination controls
-    const controls = document.createElement('div');
-    controls.id = 'weekSummaryPagination';
-    controls.style.display = 'flex';
-    controls.style.gap = '8px';
-    controls.style.alignItems = 'center';
-    controls.style.marginBottom = '8px';
-
-    const prevBtn = document.createElement('button');
-    prevBtn.textContent = '◀ Prev';
-    prevBtn.style.padding = '6px 10px';
-    prevBtn.style.cursor = 'pointer';
-
-    const nextBtn = document.createElement('button');
-    nextBtn.textContent = 'Next ▶';
-    nextBtn.style.padding = '6px 10px';
-    nextBtn.style.cursor = 'pointer';
-
-    const pageInfo = document.createElement('span');
-    pageInfo.id = 'weekSummaryPageInfo';
-    pageInfo.style.color = 'var(--text-color)';
-    pageInfo.style.fontSize = '0.95rem';
-    pageInfo.textContent = `Page 1 / ${totalPages}`;
-
-    const pageSizeLabel = document.createElement('label');
-    pageSizeLabel.style.color = 'var(--text-color)';
-    pageSizeLabel.style.fontSize = '0.9rem';
-    pageSizeLabel.textContent = ' per page: ';
-
-    const pageSizeSelect = document.createElement('select');
-    [10, 25, 40, 50, 100].forEach(n => {
-        const opt = document.createElement('option');
-        opt.value = String(n);
-        opt.textContent = String(n);
-        if (n === DEFAULT_PAGE_SIZE) opt.selected = true;
-        pageSizeSelect.appendChild(opt);
-    });
-
-    pageSizeSelect.style.marginLeft = '4px';
-    pageSizeSelect.style.padding = '4px';
-
-    controls.appendChild(prevBtn);
-    controls.appendChild(nextBtn);
-    controls.appendChild(pageInfo);
-    controls.appendChild(pageSizeLabel);
-    controls.appendChild(pageSizeSelect);
-
-    // Insert controls before the chartCanvas
-    chartContainerEl.insertBefore(controls, chartCanvas);
-
-    // State
-    let pageSize = DEFAULT_PAGE_SIZE;
-    let currentPage = 1;
-
-    // Debounced resize: re-render current page when viewport changes (keeps chart responsive on mobile)
-    function debounce(fn, wait){ let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); }; }
-    const handleResize = debounce(() => { renderPage(); }, 250);
-
-    // Attach resize listener once
-    if (!window._ssc_week_summary_resize_attached) {
-        window.addEventListener('resize', handleResize);
-        window._ssc_week_summary_resize_attached = true;
+    // Destroy previous chart instance if present
+    if (window.weekChart) {
+        try { window.weekChart.destroy(); } catch (e) { /* ignore */ }
+        window.weekChart = null;
     }
 
-    function renderPage() {
-        // Validate page
-        const pages = Math.max(1, Math.ceil(totalItems / pageSize));
-        if (currentPage > pages) currentPage = pages;
-        if (currentPage < 1) currentPage = 1;
+    console.log('Creating chart with votes:', Array.isArray(sortedVotes) ? sortedVotes.length : 0);
 
-        // Update page info
-        pageInfo.textContent = `Page ${currentPage} / ${pages}`;
+    // Robust numeric parsing for points (accept numbers, numeric-strings, or fallbacks)
+    const parseNum = v => {
+        if (v === undefined || v === null || v === '') return 0;
+        const n = Number(String(v).replace(/[^0-9.\-]/g, ''));
+        return isNaN(n) ? 0 : n;
+    };
 
-        // Slice the votes for this page
-        const startIdx = (currentPage - 1) * pageSize;
-        const endIdx = Math.min(startIdx + pageSize, totalItems);
-        const pageVotes = sortedVotes.slice(startIdx, endIdx);
+    const safeVotes = Array.isArray(sortedVotes) ? sortedVotes : [];
+    const dataPoints = safeVotes.map(v => parseNum(v?.pointsFinal ?? v?.points));
+    const labels = safeVotes.map(v => v?.songName ?? '');
 
-        // Compute canvas height for this small page (approx 40px per item clamped)
-        const pageItemCount = pageVotes.length;
-        const computed = Math.max(300, Math.min(40 * pageItemCount + 200, 1200));
+    console.log('Chart dataPoints sample (first 10):', dataPoints.slice(0, 10));
+    console.log('Chart labels sample (first 10):', labels.slice(0, 10));
+    console.log('Canvas offset size:', chartCanvas.offsetWidth, chartCanvas.offsetHeight, 'computed height:', window.getComputedStyle(chartCanvas).height);
 
-        // Make the chart container vertically scrollable if needed and set reasonable max height
-        chartContainerEl.style.overflowY = 'auto';
-        chartContainerEl.style.maxHeight = '80vh';
+    // Use passed context if provided (handleWeeklySummaryUpdate passes ctx), otherwise get from canvas
+    const context = ctx || chartCanvas.getContext('2d');
+    if (!context) {
+        console.error('Unable to obtain 2D context for weekSummaryChart');
+        return;
+    }
 
-        // Keep canvas width responsive to container and apply CSS + pixel sizing
-        chartCanvas.style.width = '100%';
-        chartCanvas.style.height = `${computed}px`;
-        try {
-            const dpr = window.devicePixelRatio || 1;
-            // Use the container width to keep visible width stable when changing page size
-            const cssWidth = (chartContainerEl && chartContainerEl.clientWidth) ? chartContainerEl.clientWidth : (chartCanvas.clientWidth || parseInt(getComputedStyle(chartCanvas).width, 10) || 800);
-            const pixelWidth = Math.max(1, Math.floor(cssWidth * dpr));
-            const pixelHeight = Math.max(1, Math.floor(computed * dpr));
-            chartCanvas.setAttribute('width', String(pixelWidth));
-            chartCanvas.setAttribute('height', String(pixelHeight));
-            chartCanvas.width = pixelWidth;
-            chartCanvas.height = pixelHeight;
-            if (window.Chart && window.Chart.defaults) {
-                window.Chart.defaults.devicePixelRatio = dpr;
-            }
-        } catch (e) {
-            // ignore sizing hiccups
-        }
-
-        // Destroy previous chart if exists
-        if (window.weekChart) {
-            try { window.weekChart.destroy(); } catch (e) { /* ignore */ }
-            window.weekChart = null;
-        }
-
-        // Prepare data for page
-        const dataPoints = pageVotes.map(v => Number(v.pointsFinal ?? v.points ?? 0));
-        const labels = pageVotes.map(v => v.songName ?? '');
-
-        // Adjust visual parameters for page size and container width (mobile friendly)
-        const containerWidth = chartContainerEl.clientWidth || 360;
-        // smaller fonts on narrow screens
-        const fontSizeY = containerWidth < 420 ? Math.max(9, Math.floor(12 - (pageItemCount / 80))) : (pageItemCount > 50 ? 11 : 12);
-        // thinner bars on narrow screens to keep spacing reasonable
-        const baseThickness = Math.floor(computed / Math.max(1, pageItemCount));
-        const barThickness = Math.max(2, Math.min(12, containerWidth < 420 ? Math.max(2, Math.floor(baseThickness * 0.6)) : Math.max(4, baseThickness)));
-
-        // Create Chart.js instance for this page
-        window.weekChart = new Chart(chartCanvas, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Total Points',
-                    data: dataPoints,
-                    backgroundColor: 'rgba(90, 30, 90, 0.95)',
-                    borderColor: 'rgba(90, 30, 90, 1)',
-                    borderWidth: 1,
-                    barThickness: barThickness
-                }]
+    // Create Chart.js instance with initial data (may be empty).
+    // Use the canvas element itself as the first argument (some Chart.js builds
+    // perform better when given the element instead of a 2D context).
+    window.weekChart = new Chart(chartCanvas, {
+        type: 'bar',
+        data: {
+            // Start with the labels/data we computed. We'll re-assign explicitly
+            // after creation to guard against Chart.js clearing behaviour.
+            labels: labels,
+            datasets: [{
+                label: 'Total Points',
+                data: dataPoints,
+                backgroundColor: 'rgba(90, 30, 90, 0.95)',
+                borderColor: 'rgba(90, 30, 90, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            animation: { duration: 300 },
+            layout: {
+                padding: { left: 15, right: 15, top: 20, bottom: 20 }
             },
-            options: {
-                responsive: false,
-                maintainAspectRatio: false,
-                indexAxis: 'y',
-                animation: { duration: 200 },
-                layout: {
-                    padding: { left: 15, right: 15, top: 10, bottom: 10 }
+            scales: {
+                y: {
+                    ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' }, padding: 10 },
+                    grid: { color: 'rgba(255,255,255,.15)' }
                 },
-                scales: {
-                    y: {
-                        ticks: { color: '#ffffff', font: { size: fontSizeY, weight: 'bold' }, padding: 6, autoSkip: false },
-                        grid: { color: 'rgba(255,255,255,.08)' }
-                    },
-                    x: {
-                        ticks: { color: '#ffffff', font: { size: 12, weight: 'bold' } },
-                        grid: { color: 'rgba(255,255,255,.08)' }
-                    }
-                },
-                plugins: {
-                    legend: { display: false },
-                    title: {
-                        display: true,
-                        text: `${selectedWeek} Points Distribution (items ${startIdx + 1}-${endIdx} of ${totalItems})`,
-                        color: '#ffffff',
-                        font: { size: 16, weight: 'bold' }
-                    },
-                    tooltip: {
-                        enabled: true,
-                        mode: 'nearest',
-                        intersect: false
-                    }
+                x: {
+                    ticks: { color: '#ffffff', font: { size: 14, weight: 'bold' } },
+                    grid: { color: 'rgba(255,255,255,.15)' }
+                }
+            },
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: `${selectedWeek} Points Distribution`,
+                    color: '#ffffff',
+                    font: { size: 18, weight: 'bold' }
                 }
             }
-        });
+        }
+    });
+
+    // Immediately (synchronously) re-assign the chart data to ensure nothing in Chart.js
+    // runtime overwrites/clears it. Then force an update.
+    try {
+        if (window.weekChart) {
+            window.weekChart.data.labels = labels;
+            window.weekChart.data.datasets = [{
+                label: 'Total Points',
+                data: dataPoints,
+                backgroundColor: 'rgba(90, 30, 90, 0.95)',
+                borderColor: 'rgba(90, 30, 90, 1)',
+                borderWidth: 1
+            }];
+            window.weekChart.update();
+            console.log('Assigned chart.labels/data synchronously; lengths:', window.weekChart.data.labels.length, window.weekChart.data.datasets[0].data.length);
+        }
+    } catch (e) {
+        console.warn('Synchronous chart assignment failed:', e);
     }
 
-    // Wire up controls
-    prevBtn.addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            renderPage();
-        }
-    });
-    nextBtn.addEventListener('click', () => {
-        const pages = Math.max(1, Math.ceil(totalItems / pageSize));
-        if (currentPage < pages) {
-            currentPage++;
-            renderPage();
-        }
-    });
-    pageSizeSelect.addEventListener('change', (e) => {
-        pageSize = parseInt(e.target.value, 10) || DEFAULT_PAGE_SIZE;
-        currentPage = 1; // reset to first page
-        renderPage();
-    });
+    // Defensive fallback: if Chart.js ended up with empty labels/data, set them explicitly and force an update.
+    try {
+        const hasEmptyData = (Array.isArray(window.weekChart.data.labels) && window.weekChart.data.labels.length === 0)
+            || (Array.isArray(window.weekChart.data.datasets?.[0]?.data) && window.weekChart.data.datasets[0].data.length === 0);
 
-    // Initial render
-    renderPage();
+        if (hasEmptyData && dataPoints.length > 0) {
+            console.warn('Chart initialized with empty data — applying fallback assignment and forcing update.');
+            window.weekChart.data.labels = labels;
+            if (!window.weekChart.data.datasets) window.weekChart.data.datasets = [{ label: 'Total Points', data: [] }];
+            window.weekChart.data.datasets[0].data = dataPoints;
+            // Ensure visible dataset
+            if (typeof window.weekChart.setDatasetVisibility === 'function') {
+                try { window.weekChart.setDatasetVisibility(0, true); } catch (e) {}
+            }
+            window.weekChart.update();
+            console.log('Fallback chart update applied. labels/data lengths:', window.weekChart.data.labels.length, window.weekChart.data.datasets[0].data.length);
+        } else {
+            window.weekChart.update();
+        }
+    } catch (e) {
+        console.warn('chart.update() or fallback assignment failed:', e);
+    }
+
+    // Extra fallback: re-assign labels/data on the next tick if Chart.js clears them asynchronously.
+    setTimeout(() => {
+        if (!window.weekChart) return;
+        try {
+            const currentLabelsLen = Array.isArray(window.weekChart.data.labels) ? window.weekChart.data.labels.length : 0;
+            const currentDataLen = Array.isArray(window.weekChart.data.datasets?.[0]?.data) ? window.weekChart.data.datasets[0].data.length : 0;
+            if ((currentLabelsLen === 0 || currentDataLen === 0) && dataPoints.length > 0) {
+                console.warn('Applying setTimeout fallback to populate chart data');
+                window.weekChart.data.labels = labels;
+                if (!window.weekChart.data.datasets) window.weekChart.data.datasets = [{ label: 'Total Points', data: [] }];
+                window.weekChart.data.datasets[0].data = dataPoints;
+                try { window.weekChart.update(); } catch (e) { console.warn('setTimeout chart.update failed', e); }
+                console.log('setTimeout fallback applied. labels/data lengths now:', window.weekChart.data.labels.length, window.weekChart.data.datasets[0].data.length);
+            }
+        } catch (e) {
+            console.warn('setTimeout fallback failed:', e);
+        }
+    }, 50);
 }
