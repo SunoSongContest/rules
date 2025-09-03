@@ -172,17 +172,41 @@ async function updatePodium(weekVotes) {
         podiumSection.style.display = 'block';
         let finalistsHTML = `<div class="podium-section"><h2 class="finalists-title">${finalistsLabel}</h2><div class="podium-container">`;
     
+        // Insert placeholders first to avoid fetching many images synchronously.
+        // We'll asynchronously populate images after inserting the DOM nodes.
         for (const song of usedFinalists) {
             const submission = (typeof window.findSubmissionBySongName === 'function')
                 ? (window.findSubmissionBySongName(song.songName) || {})
                 : {};
             const safeSubmission = submission || {};
-            const songInfo = await safeGetSongInfo(safeSubmission);
-            finalistsHTML += createPodiumHTML(song, safeSubmission, songInfo);
+            // Use placeholder image; songInfo will be populated asynchronously below.
+            const placeholder = 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365';
+            finalistsHTML += createPodiumHTML(song, safeSubmission, { imageUrl: placeholder });
         }
     
         finalistsHTML += '</div></div>';
         finalistsPodium.innerHTML = finalistsHTML;
+    
+        // Asynchronously fetch and update images for finalists (non-blocking).
+        (async () => {
+            for (const song of usedFinalists) {
+                try {
+                    const submission = (typeof window.findSubmissionBySongName === 'function')
+                        ? (window.findSubmissionBySongName(song.songName) || {})
+                        : {};
+                    const safeSubmission = submission || {};
+                    const info = await safeGetSongInfo(safeSubmission);
+                    if (info && info.imageUrl) {
+                        const selector = `.podium-container [data-song-name="${encodeURIComponent(song.songName)}"] img`;
+                        const imgEl = finalistsPodium.querySelector(selector);
+                        if (imgEl) imgEl.src = info.imageUrl;
+                    }
+                } catch (e) {
+                    // Don't block on individual failures
+                    console.warn('Failed to load finalist image for', song.songName, e);
+                }
+            }
+        })();
     
         if (usedSecondChance.length > 0) {
             secondChanceSection.style.display = 'block';
@@ -193,12 +217,32 @@ async function updatePodium(weekVotes) {
                     ? (window.findSubmissionBySongName(song.songName) || {})
                     : {};
                 const safeSubmission = submission || {};
-                const songInfo = await safeGetSongInfo(safeSubmission);
-                secondChanceHTML += createPodiumHTML(song, safeSubmission, songInfo);
+                const placeholder = 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365';
+                secondChanceHTML += createPodiumHTML(song, safeSubmission, { imageUrl: placeholder });
             }
     
             secondChanceHTML += '</div></div>';
             secondChancePodium.innerHTML = secondChanceHTML;
+    
+            // Asynchronously fetch and update second-chance images
+            (async () => {
+                for (const song of usedSecondChance) {
+                    try {
+                        const submission = (typeof window.findSubmissionBySongName === 'function')
+                            ? (window.findSubmissionBySongName(song.songName) || {})
+                            : {};
+                        const safeSubmission = submission || {};
+                        const info = await safeGetSongInfo(safeSubmission);
+                        if (info && info.imageUrl) {
+                            const selector = `.podium-container [data-song-name="${encodeURIComponent(song.songName)}"] img`;
+                            const imgEl = secondChancePodium.querySelector(selector);
+                            if (imgEl) imgEl.src = info.imageUrl;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to load second-chance image for', song.songName, e);
+                    }
+                }
+            })();
         } else {
             secondChanceSection.style.display = 'none';
         }
@@ -218,8 +262,11 @@ function createPodiumHTML(song, submission = {}, songInfo = { imageUrl: '' }, si
     const artist = submission.sunoUsername || submission.suno_username || submission.artist || '-';
     const imageUrl = songInfo?.imageUrl || 'https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365';
 
+    // Include a data attribute with an encoded song name so we can find the node later for lazy image replacement.
+    const dataAttr = `data-song-name="${encodeURIComponent(song.songName)}"`;
+
     return `
-        <div class="podium-item${sizeClass}">
+        <div class="podium-item${sizeClass}" ${dataAttr}>
             <a href="${submission.songUrl || '#'}" target="_blank">
                 <img src="${imageUrl}" alt="${escapeHtml(song.songName)}" onerror="this.src='https://cdn.glitch.global/1f7954fd-4779-4304-a1e0-16c4218d8634/ssc_coverart_logo.jpeg?v=1733688489365'">
             </a>
