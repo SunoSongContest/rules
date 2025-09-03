@@ -686,25 +686,35 @@ function initializeWeekListeners() {
     const summaryWeekSelect = document.getElementById('summaryWeekSelect');
     
     // Song votes view listener
+    // NOTE: only match by the canonical stage/week label (not by result flags).
+    // Matching by `result` causes group-stage entries that *advance to* a subsequent
+    // stage (e.g., many group songs with result "Track Save Week") to be included when
+    // selecting that later stage. That leads to inflated lists. Use stage equality only.
     weekSelect.addEventListener('change', (e) => {
-        console.log('Week selection changed:', e.target.value);
+        console.log('Week selection changed (data-handlers):', e.target.value);
         const target = normalizeStageLabel(e.target.value);
-        const weekSongs = window.votes.filter(v => {
-            const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
-            const nr = normalizeStageLabel(v.result);
-            return ns === target || nr === target;
-        });
-        console.log('Found songs:', weekSongs.length, weekSongs);
-        
         const songSelect = document.getElementById('songSelect');
         songSelect.innerHTML = '<option value="">Select Song</option>';
-        
+        if (!target || !Array.isArray(window.votes)) {
+            console.log('No target or votes available for week selection');
+            return;
+        }
+
+        // Filter strictly by normalized stage/week/stageLabel to avoid pulling
+        // songs from other weeks that merely have a "result" pointing to this stage.
+        const weekSongs = window.votes.filter(v => {
+            const ns = normalizeStageLabel(v.stage) || normalizeStageLabel(v.week) || normalizeStageLabel(v.stageLabel);
+            return ns === target;
+        });
+
+        console.log('Filtered songs for week (strict stage match):', weekSongs.length, weekSongs);
+
         weekSongs
-            .sort((a, b) => parseInt(b.pointsFinal) - parseInt(a.pointsFinal))
+            .sort((a, b) => Number(b.pointsFinal ?? b.points ?? 0) - Number(a.pointsFinal ?? a.points ?? 0))
             .forEach(song => {
                 const option = document.createElement('option');
                 option.value = song.songName;
-                option.textContent = `${song.songName} (${song.pointsFinal} pts)`;
+                option.textContent = `${song.songName} (${song.pointsFinal ?? song.points ?? 0} pts)`;
                 songSelect.appendChild(option);
             });
     });
