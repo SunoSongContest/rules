@@ -252,7 +252,24 @@ function createStyledAudioPlayer() {
     audioPlayer.controls = true;
     audioPlayer.className = 'styled-player';
     audioPlayer.crossOrigin = 'anonymous';
-    
+
+    // Prevent the browser's media controls download option and other remote UI affordances.
+    // controlsList is supported in modern browsers (Chrome/Edge/Firefox partial). We set both
+    // attribute and property for broader compatibility.
+    try {
+        audioPlayer.setAttribute('controlsList', 'nodownload nofullscreen noremoteplayback');
+        audioPlayer.controlsList = 'nodownload nofullscreen noremoteplayback';
+    } catch (e) {
+        // ignore if not supported
+    }
+    // Disable picture-in-picture where supported
+    try { audioPlayer.disablePictureInPicture = true; } catch (e) {}
+    // Prevent right-click context menu on the audio element to reduce download options
+    audioPlayer.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        return false;
+    });
+
     // Add CSS styles
     const styleSheet = document.createElement('style');
     styleSheet.textContent = `
